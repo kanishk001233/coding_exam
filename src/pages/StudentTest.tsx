@@ -77,11 +77,14 @@ export const StudentTest: React.FC<StudentTestProps> = ({
     setActiveOutputTab('testcase');
   }, [activeQuestion]);
 
+  const isTabTrackingEnabled = test.enable_tab_switch_tracking !== false && (test.enable_tab_switch_tracking as any) !== 'false';
+  const isFullscreenEnabled = test.enable_fullscreen_mode !== false && (test.enable_fullscreen_mode as any) !== 'false';
+
   useEffect(() => {
-    if (test.enable_fullscreen_mode !== false) {
+    if (isFullscreenEnabled) {
       enterFullscreen();
     }
-  }, [enterFullscreen, test.enable_fullscreen_mode]);
+  }, [enterFullscreen, isFullscreenEnabled]);
 
   // Handle Run Code (Executes editable test cases and opens Test Result tab)
   const handleRunCode = async (customCasesToRun?: EditableCase[]) => {
@@ -418,6 +421,9 @@ export const StudentTest: React.FC<StudentTestProps> = ({
 
       {/* Anti-cheat Alert Dialog Box in front of screen */}
       {cheatingWarning && (
+        (cheatingWarning.type === 'TAB_SWITCH' && isTabTrackingEnabled) ||
+        (cheatingWarning.type === 'FULLSCREEN_EXIT' && isFullscreenEnabled)
+      ) && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="max-w-md w-full bg-white dark:bg-slate-900 border-2 border-rose-500 rounded-2xl shadow-2xl p-6 space-y-5 text-center relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-rose-500 via-amber-500 to-rose-500"></div>

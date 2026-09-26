@@ -61,7 +61,7 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
         </div>
 
         {/* Tab switch anti-cheat badge */}
-        {tabSwitchCount > 0 && (
+        {test.enable_tab_switch_tracking !== false && (test.enable_tab_switch_tracking as any) !== 'false' && tabSwitchCount > 0 && (
           <div
             className="flex items-center gap-1 px-2 py-1 rounded bg-rose-100 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300 text-[11px] font-mono"
             title={`${tabSwitchCount} tab switch/blur event(s) recorded`}

@@ -96,20 +96,52 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   };
 
   const handleToggleTabSwitch = async (test: Test) => {
+    const isCurrentlyEnabled = test.enable_tab_switch_tracking !== false && (test.enable_tab_switch_tracking as any) !== 'false';
+    const nextVal = !isCurrentlyEnabled;
     const updated: Test = {
       ...test,
-      enable_tab_switch_tracking: test.enable_tab_switch_tracking === false ? true : false,
+      enable_tab_switch_tracking: nextVal,
     };
     await mockDb.saveTest(updated);
+    
+    // Sync active test session storage if currently running locally
+    const activeTestRaw = sessionStorage.getItem('c_exam_active_test');
+    if (activeTestRaw) {
+      try {
+        const activeTest = JSON.parse(activeTestRaw);
+        if (activeTest.id === test.id) {
+          sessionStorage.setItem('c_exam_active_test', JSON.stringify(updated));
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    
     setTests(mockDb.getTests());
   };
 
   const handleToggleFullscreen = async (test: Test) => {
+    const isCurrentlyEnabled = test.enable_fullscreen_mode !== false && (test.enable_fullscreen_mode as any) !== 'false';
+    const nextVal = !isCurrentlyEnabled;
     const updated: Test = {
       ...test,
-      enable_fullscreen_mode: test.enable_fullscreen_mode === false ? true : false,
+      enable_fullscreen_mode: nextVal,
     };
     await mockDb.saveTest(updated);
+    
+    // Sync active test session storage if currently running locally
+    const activeTestRaw = sessionStorage.getItem('c_exam_active_test');
+    if (activeTestRaw) {
+      try {
+        const activeTest = JSON.parse(activeTestRaw);
+        if (activeTest.id === test.id) {
+          sessionStorage.setItem('c_exam_active_test', JSON.stringify(updated));
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
     setTests(mockDb.getTests());
   };
 

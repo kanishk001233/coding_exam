@@ -23,7 +23,9 @@ function StudentTestWrapper() {
     return <Navigate to="/student" replace />;
   }
 
-  const test: Test = JSON.parse(testRaw);
+  const parsedTest: Test = JSON.parse(testRaw);
+  const testFromDb = mockDb.getTestById(parsedTest.id);
+  const test: Test = testFromDb ? { ...parsedTest, ...testFromDb } : parsedTest;
   const attempt: TestAttempt = JSON.parse(attemptRaw);
 
   // If already submitted or closed, redirect to results view

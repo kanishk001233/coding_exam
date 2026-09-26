@@ -31,9 +31,12 @@ export function useTest({ test, attempt }: UseTestProps) {
   const questions: Question[] = test.questions || [];
   const currentQuestion: Question | undefined = questions[currentQuestionIndex];
 
+  const isTabTrackingEnabled = test.enable_tab_switch_tracking !== false && (test.enable_tab_switch_tracking as any) !== 'false';
+  const isFullscreenEnabled = test.enable_fullscreen_mode !== false && (test.enable_fullscreen_mode as any) !== 'false';
+
   // Anti-cheat 1: Track visibility change and window blur (if enabled on test)
   useEffect(() => {
-    if (test.enable_tab_switch_tracking === false) {
+    if (!isTabTrackingEnabled) {
       return;
     }
 
@@ -94,11 +97,11 @@ export function useTest({ test, attempt }: UseTestProps) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
     };
-  }, [test.enable_tab_switch_tracking]);
+  }, [isTabTrackingEnabled]);
 
   // Anti-cheat 2: Track Fullscreen Exit (if enabled on test)
   useEffect(() => {
-    if (test.enable_fullscreen_mode === false) {
+    if (!isFullscreenEnabled) {
       return;
     }
 
@@ -162,7 +165,7 @@ export function useTest({ test, attempt }: UseTestProps) {
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
-  }, [test.enable_fullscreen_mode]);
+  }, [isFullscreenEnabled]);
 
   const enterFullscreen = useCallback(async () => {
     try {
