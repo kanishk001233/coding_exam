@@ -184,12 +184,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       {/* Top Navbar */}
       <nav className="bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex items-center justify-between sticky top-0 z-20">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white font-bold text-base shadow-md shadow-indigo-500/20">
-            C
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white font-black text-sm shadow-md shadow-indigo-500/20">
+            CA
           </div>
           <div>
             <h1 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-              Instructor Dashboard
+              CodeArena Instructor Dashboard
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
               {user.name} ({user.email})

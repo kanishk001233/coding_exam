@@ -31,14 +31,18 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
     <header className="bg-white/95 dark:bg-slate-950/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 px-4 py-2.5 flex items-center justify-between select-none shrink-0 z-20 transition-colors">
       {/* Brand & Test Title */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white font-bold text-sm shadow-md shadow-indigo-500/20">
-            C
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white font-black text-xs shadow-md shadow-indigo-500/20">
+            CA
           </div>
           <div>
-            <h1 className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate max-w-[180px] sm:max-w-[320px]">
-              {test.title}
-            </h1>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">CodeArena</span>
+              <span className="text-slate-300 dark:text-slate-700">•</span>
+              <h1 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-tight truncate max-w-[150px] sm:max-w-[280px]">
+                {test.title}
+              </h1>
+            </div>
             <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
               <span>Code: <strong className="text-indigo-600 dark:text-indigo-300 font-mono">{test.join_code}</strong></span>
               <span className="text-slate-300 dark:text-slate-600">•</span>

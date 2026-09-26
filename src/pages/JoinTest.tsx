@@ -128,8 +128,11 @@ export const JoinTest: React.FC = () => {
       <div className="w-full max-w-lg space-y-6">
         {/* Brand */}
         <div className="text-center space-y-1">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white font-black text-xl shadow-lg shadow-indigo-500/25 mb-2">
+            CA
+          </div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-            Join Coding Test
+            CodeArena
           </h1>
           <p className="text-xs text-slate-600 dark:text-slate-400">
             Enter your test code and student details to begin your examination

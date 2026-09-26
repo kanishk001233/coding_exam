@@ -86,11 +86,11 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md space-y-6">
         {/* Brand header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 shadow-xl shadow-indigo-500/25 border border-indigo-400/30">
-            <Code2 className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white font-black text-2xl shadow-xl shadow-indigo-500/25 border border-indigo-400/30 mb-1">
+            CA
           </div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-            Teacher Portal
+            CodeArena Instructor Portal
           </h1>
           <p className="text-xs text-slate-600 dark:text-slate-400">
             Sign in to manage tests, monitor students, and view assessment results
