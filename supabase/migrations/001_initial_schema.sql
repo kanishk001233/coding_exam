@@ -34,7 +34,9 @@ CREATE TABLE tests (
   end_time TIMESTAMPTZ,
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'live', 'ended')),
   created_by TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  enable_tab_switch_tracking BOOLEAN DEFAULT true,
+  enable_fullscreen_mode BOOLEAN DEFAULT true
 );
 
 -- 3. Questions table

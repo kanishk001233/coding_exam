@@ -5,7 +5,7 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { StudentList } from '../components/StudentList';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
-import { Plus, Play, Pause, BarChart2, BookOpen, Clock, Users, Key, LogOut, Trash2, Edit3, Code2, Eye, EyeOff } from 'lucide-react';
+import { Plus, Play, Pause, BarChart2, BookOpen, Clock, Users, Key, LogOut, Trash2, Edit3, Code2, Eye, EyeOff, ShieldAlert, Maximize2 } from 'lucide-react';
 
 interface TeacherDashboardProps {
   user: { id: string; name: string; email: string };
@@ -92,6 +92,24 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       ...test,
       status: nextStatus,
     });
+    setTests(mockDb.getTests());
+  };
+
+  const handleToggleTabSwitch = async (test: Test) => {
+    const updated: Test = {
+      ...test,
+      enable_tab_switch_tracking: test.enable_tab_switch_tracking === false ? true : false,
+    };
+    await mockDb.saveTest(updated);
+    setTests(mockDb.getTests());
+  };
+
+  const handleToggleFullscreen = async (test: Test) => {
+    const updated: Test = {
+      ...test,
+      enable_fullscreen_mode: test.enable_fullscreen_mode === false ? true : false,
+    };
+    await mockDb.saveTest(updated);
     setTests(mockDb.getTests());
   };
 
@@ -359,6 +377,43 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                               <Users className="w-3.5 h-3.5 text-slate-400" />
                               {testAttempts.length} Students
                             </span>
+                          </div>
+
+                          {/* Anti-cheat Proctoring Badges */}
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleTabSwitch(test);
+                              }}
+                              className={`px-2 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                                test.enable_tab_switch_tracking !== false
+                                  ? 'bg-emerald-100/70 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30 hover:bg-emerald-200/70'
+                                  : 'bg-slate-200/60 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700 line-through hover:bg-slate-300/60'
+                              }`}
+                              title="Click to enable/disable Tab Switch tracking for this test"
+                            >
+                              <ShieldAlert className="w-3 h-3" />
+                              <span>Tab: {test.enable_tab_switch_tracking !== false ? 'ON' : 'OFF'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleFullscreen(test);
+                              }}
+                              className={`px-2 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                                test.enable_fullscreen_mode !== false
+                                  ? 'bg-indigo-100/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-500/30 hover:bg-indigo-200/70'
+                                  : 'bg-slate-200/60 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700 line-through hover:bg-slate-300/60'
+                              }`}
+                              title="Click to enable/disable Fullscreen requirement for this test"
+                            >
+                              <Maximize2 className="w-3 h-3" />
+                              <span>Fullscreen: {test.enable_fullscreen_mode !== false ? 'ON' : 'OFF'}</span>
+                            </button>
                           </div>
                         </div>
                       </div>

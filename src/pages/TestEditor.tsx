@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Test, Question, TestCase } from '../types/database';
 import { mockDb } from '../lib/mockDb';
-import { ArrowLeft, Plus, Trash2, Save, Eye, EyeOff, Code2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Eye, EyeOff, Code2, ShieldCheck } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
 
@@ -13,6 +13,12 @@ interface TestEditorProps {
 
 export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }) => {
   const [currentTest, setCurrentTest] = useState<Test>({ ...test });
+  const [enableTabSwitchTracking, setEnableTabSwitchTracking] = useState<boolean>(
+    test.enable_tab_switch_tracking !== false
+  );
+  const [enableFullscreenMode, setEnableFullscreenMode] = useState<boolean>(
+    test.enable_fullscreen_mode !== false
+  );
   const [questions, setQuestions] = useState<Question[]>(test.questions || []);
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState<number>(0);
   const [validationAlert, setValidationAlert] = useState<{ title: string; message: string } | null>(null);
@@ -119,6 +125,8 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
       ...currentTest,
       questions,
       total_marks: totalMarks,
+      enable_tab_switch_tracking: enableTabSwitchTracking,
+      enable_fullscreen_mode: enableFullscreenMode,
     };
 
     await mockDb.saveTest(updated);
@@ -153,6 +161,116 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
               <Save className="w-4 h-4" />
               <span>Save All Changes</span>
             </button>
+          </div>
+        </div>
+
+        {/* Test Settings & Anti-Cheat Controls Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Test Title</label>
+              <input
+                type="text"
+                value={currentTest.title}
+                onChange={(e) => setCurrentTest({ ...currentTest, title: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Duration (Minutes)</label>
+              <input
+                type="number"
+                min={5}
+                max={300}
+                value={currentTest.duration_minutes}
+                onChange={(e) => setCurrentTest({ ...currentTest, duration_minutes: Number(e.target.value) || 45 })}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Status</label>
+              <select
+                value={currentTest.status}
+                onChange={(e) => setCurrentTest({ ...currentTest, status: e.target.value as any })}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+              >
+                <option value="live">Live</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="draft">Draft</option>
+                <option value="ended">Ended</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck className="w-4 h-4 text-indigo-500" />
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                Anti-Cheat & Proctoring Controls
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Tab Switch Toggle */}
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">Tab Switch & Blur Tracking</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      enableTabSwitchTracking
+                        ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}>
+                      {enableTabSwitchTracking ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Track and record tab switches or window blur events during the exam.
+                  </p>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={enableTabSwitchTracking}
+                    onChange={(e) => setEnableTabSwitchTracking(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
+              {/* Fullscreen Toggle */}
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">Enforce Fullscreen Mode</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      enableFullscreenMode
+                        ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}>
+                      {enableFullscreenMode ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Require fullscreen and trigger violation warnings on fullscreen exit.
+                  </p>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={enableFullscreenMode}
+                    onChange={(e) => setEnableFullscreenMode(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
 

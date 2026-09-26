@@ -64,6 +64,8 @@ export interface Test {
   created_at?: string;
   questions?: Question[];
   total_marks?: number;
+  enable_tab_switch_tracking?: boolean;
+  enable_fullscreen_mode?: boolean;
 }
 
 export interface TestAttempt {

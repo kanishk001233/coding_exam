@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Test, Question, TestCase } from '../types/database';
 import { mockDb } from '../lib/mockDb';
-import { ArrowLeft, Check, RefreshCw, Plus, Trash2, Eye, EyeOff, Code2, Upload, FileSpreadsheet, Download } from 'lucide-react';
+import { ArrowLeft, Check, RefreshCw, Plus, Trash2, Eye, EyeOff, Code2, Upload, FileSpreadsheet, Download, ShieldCheck } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
 import { downloadSampleCSVTemplate, parseCSVToQuestions } from '../lib/csvHelper';
@@ -17,6 +17,8 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
   const [joinCode, setJoinCode] = useState(() => 'C' + Math.floor(1000 + Math.random() * 9000));
   const [durationMinutes, setDurationMinutes] = useState(45);
   const [status, setStatus] = useState<'draft' | 'scheduled' | 'live'>('live');
+  const [enableTabSwitchTracking, setEnableTabSwitchTracking] = useState(true);
+  const [enableFullscreenMode, setEnableFullscreenMode] = useState(true);
 
   // Dialog State
   const [validationAlert, setValidationAlert] = useState<{ title: string; message: string } | null>(null);
@@ -252,6 +254,8 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
       created_at: new Date().toISOString(),
       questions: finalQuestions,
       total_marks: totalMarks,
+      enable_tab_switch_tracking: enableTabSwitchTracking,
+      enable_fullscreen_mode: enableFullscreenMode,
     };
 
     await mockDb.saveTest(newTest);
@@ -353,6 +357,79 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
                   <option value="scheduled">Scheduled</option>
                   <option value="draft">Draft</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Anti-Cheat & Proctoring Controls Card */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-indigo-500" />
+                Anti-Cheat & Proctoring Controls
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Configure browser restrictions and integrity tracking for students taking this test
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              {/* Tab Switch Detection Toggle */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">Tab Switch & Window Blur Detection</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      enableTabSwitchTracking
+                        ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}>
+                      {enableTabSwitchTracking ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Track and log whenever students navigate away, switch tabs, or lose window focus, showing anti-cheat integrity alerts.
+                  </p>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={enableTabSwitchTracking}
+                    onChange={(e) => setEnableTabSwitchTracking(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
+              {/* Fullscreen Mode Toggle */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">Enforce Fullscreen Mode</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      enableFullscreenMode
+                        ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}>
+                      {enableFullscreenMode ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Automatically launch test in fullscreen mode and log violations / alerts if a student exits fullscreen.
+                  </p>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={enableFullscreenMode}
+                    onChange={(e) => setEnableFullscreenMode(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
               </div>
             </div>
           </div>

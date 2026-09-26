@@ -78,8 +78,10 @@ export const StudentTest: React.FC<StudentTestProps> = ({
   }, [activeQuestion]);
 
   useEffect(() => {
-    enterFullscreen();
-  }, [enterFullscreen]);
+    if (test.enable_fullscreen_mode !== false) {
+      enterFullscreen();
+    }
+  }, [enterFullscreen, test.enable_fullscreen_mode]);
 
   // Handle Run Code (Executes editable test cases and opens Test Result tab)
   const handleRunCode = async (customCasesToRun?: EditableCase[]) => {

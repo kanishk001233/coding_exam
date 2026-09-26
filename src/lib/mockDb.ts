@@ -400,6 +400,8 @@ class DatabaseService {
           status: test.status,
           created_by: test.created_by,
           created_at: test.created_at,
+          enable_tab_switch_tracking: test.enable_tab_switch_tracking !== false,
+          enable_fullscreen_mode: test.enable_fullscreen_mode !== false,
         });
 
         if (testErr) {
