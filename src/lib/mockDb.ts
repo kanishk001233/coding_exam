@@ -9,19 +9,7 @@ export const INITIAL_QUESTION_BANK: Omit<Question, 'test_id'>[] = [
     input_format: 'A single integer N.',
     output_format: 'Print "Even" if N is even, otherwise print "Odd".',
     constraints: '-10^6 <= N <= 10^6',
-    starter_code: `#include <stdio.h>
-
-int main() {
-    int n;
-    if (scanf("%d", &n) == 1) {
-        if (n % 2 == 0) {
-            printf("Even\\n");
-        } else {
-            printf("Odd\\n");
-        }
-    }
-    return 0;
-}`,
+    starter_code: `#include <stdio.h>\n\nint main() {\n    //write your code here\n    return 0;\n}`,
     difficulty: 'easy',
     marks: 10,
     time_limit_ms: 2000,
@@ -77,14 +65,7 @@ int main() {
     input_format: 'Two space-separated integers A and B.',
     output_format: 'Print a single integer: A + B.',
     constraints: '-10^5 <= A, B <= 10^5',
-    starter_code: `#include <stdio.h>
-
-int main() {
-    int a, b;
-    scanf("%d %d", &a, &b);
-    printf("%d\\n", a + b);
-    return 0;
-}`,
+    starter_code: `#include <stdio.h>\n\nint main() {\n    //write your code here\n    return 0;\n}`,
     difficulty: 'easy',
     marks: 10,
     time_limit_ms: 2000,
@@ -132,19 +113,7 @@ int main() {
     input_format: 'A single non-negative integer N.',
     output_format: 'Print the factorial of N.',
     constraints: '0 <= N <= 12',
-    starter_code: `#include <stdio.h>
-
-int main() {
-    int n;
-    scanf("%d", &n);
-    
-    long long fact = 1;
-    for (int i = 1; i <= n; i++) {
-        fact *= i;
-    }
-    printf("%lld\\n", fact);
-    return 0;
-}`,
+    starter_code: `#include <stdio.h>\n\nint main() {\n    //write your code here\n    return 0;\n}`,
     difficulty: 'medium',
     marks: 15,
     time_limit_ms: 2000,
@@ -184,25 +153,7 @@ int main() {
     input_format: 'First line contains N. Second line contains N space-separated integers.',
     output_format: 'Print the maximum integer found in the array.',
     constraints: '1 <= N <= 1000, -10^5 <= array[i] <= 10^5',
-    starter_code: `#include <stdio.h>
-
-int main() {
-    int n;
-    scanf("%d", &n);
-    int arr[1000];
-    for (int i = 0; i < n; i++) {
-        scanf("%d", &arr[i]);
-    }
-    
-    int maxVal = arr[0];
-    for (int i = 1; i < n; i++) {
-        if (arr[i] > maxVal) {
-            maxVal = arr[i];
-        }
-    }
-    printf("%d\\n", maxVal);
-    return 0;
-}`,
+    starter_code: `#include <stdio.h>\n\nint main() {\n    //write your code here\n    return 0;\n}`,
     difficulty: 'medium',
     marks: 15,
     time_limit_ms: 2000,
@@ -242,29 +193,7 @@ int main() {
     input_format: 'A single positive integer N.',
     output_format: 'Print "Prime" if N is prime, otherwise print "Not Prime".',
     constraints: '1 <= N <= 10^6',
-    starter_code: `#include <stdio.h>
-
-int main() {
-    int n;
-    scanf("%d", &n);
-    if (n <= 1) {
-        printf("Not Prime\\n");
-        return 0;
-    }
-    int isPrime = 1;
-    for (int i = 2; i * i <= n; i++) {
-        if (n % i == 0) {
-            isPrime = 0;
-            break;
-        }
-    }
-    if (isPrime) {
-        printf("Prime\\n");
-    } else {
-        printf("Not Prime\\n");
-    }
-    return 0;
-}`,
+    starter_code: `#include <stdio.h>\n\nint main() {\n    //write your code here\n    return 0;\n}`,
     difficulty: 'medium',
     marks: 15,
     time_limit_ms: 2000,

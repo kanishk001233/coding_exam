@@ -46,7 +46,7 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
   const [newQInputFormat, setNewQInputFormat] = useState('');
   const [newQOutputFormat, setNewQOutputFormat] = useState('');
   const [newQConstraints, setNewQConstraints] = useState('1 <= N <= 10^5');
-  const [newQStarterCode, setNewQStarterCode] = useState(`#include <stdio.h>\n\nint main() {\n    // Write your code here\n    \n    return 0;\n}`);
+  const [newQStarterCode, setNewQStarterCode] = useState(`#include <stdio.h>\n\nint main() {\n    //write your code here\n    return 0;\n}`);
   const [newQTestCases, setNewQTestCases] = useState<TestCase[]>([
     {
       id: 'tc-sample-1',

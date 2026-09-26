@@ -129,7 +129,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       input_format: '',
       output_format: '',
       constraints: '1 <= N <= 10^5',
-      starter_code: `#include <stdio.h>\n\nint main() {\n    // Write your code here\n    \n    return 0;\n}`,
+      starter_code: `#include <stdio.h>\n\nint main() {\n    //write your code here\n    return 0;\n}`,
       test_cases: [
         {
           id: 'tc-' + Math.random().toString(36).substring(2, 9),
