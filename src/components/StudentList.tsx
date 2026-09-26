@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { TestAttempt } from '../types/database';
-import { UserCheck, ShieldAlert, FileCode2, Maximize2, ExternalLink, Trash2, RefreshCw } from 'lucide-react';
+import { Test, TestAttempt } from '../types/database';
+import { UserCheck, ShieldAlert, FileCode2, Maximize2, ExternalLink, Trash2, RefreshCw, FileText } from 'lucide-react';
 import { ModalDialog } from './ModalDialog';
+import { generateTestPDFReport } from '../lib/pdfReport';
 
 interface StudentListProps {
+  test?: Test;
   attempts: TestAttempt[];
   onViewStudentSubmission?: (attempt: TestAttempt) => void;
   onDeleteStudentAttempt?: (attemptId: string) => void;
@@ -12,6 +14,7 @@ interface StudentListProps {
 }
 
 export const StudentList: React.FC<StudentListProps> = ({
+  test,
   attempts,
   onViewStudentSubmission,
   onDeleteStudentAttempt,
@@ -62,6 +65,18 @@ export const StudentList: React.FC<StudentListProps> = ({
               <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />
               <span>{totalFlags} Total Flags</span>
             </div>
+          )}
+
+          {test && attempts.length > 0 && (
+            <button
+              type="button"
+              onClick={() => generateTestPDFReport(test, attempts)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all active:scale-95 cursor-pointer"
+              title="Download detailed PDF report with summary and student responses"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Download PDF Result</span>
+            </button>
           )}
 
           {onRefresh && (

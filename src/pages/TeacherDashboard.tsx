@@ -443,6 +443,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </div>
 
                 <StudentList
+                  test={selectedTest}
                   attempts={attempts}
                   onViewStudentSubmission={onViewStudentSubmission}
                   onDeleteStudentAttempt={handleDeleteStudentAttempt}

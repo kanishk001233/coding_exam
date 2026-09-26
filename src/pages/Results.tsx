@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Test, TestAttempt } from '../types/database';
 import { mockDb } from '../lib/mockDb';
-import { CheckCircle, ArrowLeft, BarChart3, Users, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { CheckCircle, ArrowLeft, BarChart3, Users, FileSpreadsheet, FileText, Trash2 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
+import { generateTestPDFReport } from '../lib/pdfReport';
 
 interface ResultsProps {
   test: Test;
@@ -145,14 +146,26 @@ export const Results: React.FC<ResultsProps> = ({
           <div className="flex items-center gap-3">
             <ThemeToggle />
             {isTeacherView && (
-              <button
-                type="button"
-                onClick={handleExportCSV}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>Export CSV Report</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => generateTestPDFReport(test, allAttempts)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 transition-all active:scale-95 cursor-pointer"
+                  title="Download aesthetic PDF Report with Class Summary & Individual Student Submissions"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Download PDF Report</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportCSV}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Export CSV</span>
+                </button>
+              </>
             )}
           </div>
         </div>
