@@ -128,3 +128,14 @@ export interface TestEvent {
   timestamp: string;
   metadata?: Record<string, any>;
 }
+
+export interface HelpRequest {
+  id: string;
+  test_id: string;
+  attempt_id: string;
+  student_name: string;
+  student_roll_no: string;
+  question_title?: string;
+  requested_at: string;
+  status: 'pending' | 'resolved';
+}

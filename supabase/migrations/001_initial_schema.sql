@@ -150,6 +150,18 @@ CREATE INDEX IF NOT EXISTS idx_submission_results_sub_id ON submission_results (
 -- Test events (Anti-cheat logs)
 CREATE INDEX IF NOT EXISTS idx_test_events_attempt_time ON test_events (attempt_id, timestamp DESC);
 
+-- 9. Help requests table (Offline Classroom Assistance Queue)
+CREATE TABLE IF NOT EXISTS help_requests (
+  id TEXT PRIMARY KEY,
+  test_id TEXT REFERENCES tests(id) ON DELETE CASCADE,
+  attempt_id TEXT REFERENCES test_attempts(id) ON DELETE CASCADE,
+  student_name TEXT NOT NULL,
+  student_roll_no TEXT NOT NULL,
+  question_title TEXT,
+  requested_at TIMESTAMPTZ DEFAULT NOW(),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'resolved'))
+);
+
 -- Enable Row Level Security (RLS)
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tests ENABLE ROW LEVEL SECURITY;
@@ -159,6 +171,7 @@ ALTER TABLE test_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE submission_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE test_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE help_requests ENABLE ROW LEVEL SECURITY;
 
 -- Grant Full Anonymous Access Policies (Read/Write/Update/Delete)
 CREATE POLICY "Public profiles all" ON profiles FOR ALL USING (true) WITH CHECK (true);
@@ -168,4 +181,6 @@ CREATE POLICY "Public test cases all" ON test_cases FOR ALL USING (true) WITH CH
 CREATE POLICY "Public attempts all" ON test_attempts FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public submissions all" ON submissions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public submission results all" ON submission_results FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public test events all" ON test_events FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public help requests all" ON help_requests FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public events all" ON test_events FOR ALL USING (true) WITH CHECK (true);

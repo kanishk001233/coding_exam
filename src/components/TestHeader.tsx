@@ -1,7 +1,7 @@
 import React from 'react';
 import { Test } from '../types/database';
 import { TestTimer } from './TestTimer';
-import { Maximize2, ShieldAlert, Save, LogOut } from 'lucide-react';
+import { Maximize2, ShieldAlert, Save, LogOut, Hand, HelpCircle } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 interface TestHeaderProps {
@@ -11,6 +11,8 @@ interface TestHeaderProps {
   isSaving: boolean;
   lastSavedTime: Date | null;
   tabSwitchCount: number;
+  isHelpRequested?: boolean;
+  onToggleNeedHelp?: () => void;
   onEnterFullscreen: () => void;
   onFinishTest: () => void;
   onExpireTimer: () => void;
@@ -23,6 +25,8 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
   isSaving,
   lastSavedTime,
   tabSwitchCount,
+  isHelpRequested = false,
+  onToggleNeedHelp,
   onEnterFullscreen,
   onFinishTest,
   onExpireTimer,
@@ -53,9 +57,35 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5 sm:gap-3">
+        {/* Offline Classroom Help Request Button */}
+        {onToggleNeedHelp && (
+          <button
+            type="button"
+            onClick={onToggleNeedHelp}
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-sm cursor-pointer ${
+              isHelpRequested
+                ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30 animate-pulse border border-amber-400'
+                : 'bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-300/80 dark:border-amber-500/40'
+            }`}
+            title={isHelpRequested ? 'Teacher notified! Click to cancel help request.' : 'Click to notify instructor that you need assistance at your desk.'}
+          >
+            {isHelpRequested ? (
+              <>
+                <Hand className="w-3.5 h-3.5" />
+                <span>Help Requested ⏳</span>
+              </>
+            ) : (
+              <>
+                <HelpCircle className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                <span>Need Help?</span>
+              </>
+            )}
+          </button>
+        )}
+
         {/* Auto-save status */}
-        <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+        <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
           <Save className={`w-3.5 h-3.5 ${isSaving ? 'text-amber-500 animate-spin' : 'text-emerald-500 dark:text-emerald-400'}`} />
           <span>{isSaving ? 'Saving...' : 'Auto-saved'}</span>
         </div>

@@ -1,4 +1,4 @@
-import { Test, Question, TestCase, TestAttempt, Submission, TestEvent } from '../types/database';
+import { Test, Question, TestCase, TestAttempt, Submission, TestEvent, HelpRequest } from '../types/database';
 import { supabase, isSupabaseConfigured } from './supabase';
 
 export const INITIAL_QUESTION_BANK: Omit<Question, 'test_id'>[] = [
@@ -235,6 +235,7 @@ class DatabaseService {
   private eventsKey = 'c_exam_events_v2';
   private codeDraftsKey = 'c_exam_drafts_v2';
   private questionBankKey = 'c_exam_question_bank_v2';
+  private helpRequestsKey = 'c_exam_help_requests_v2';
 
   constructor() {
     this.init();
@@ -255,6 +256,9 @@ class DatabaseService {
     }
     if (!localStorage.getItem(this.questionBankKey)) {
       localStorage.setItem(this.questionBankKey, JSON.stringify(INITIAL_QUESTION_BANK));
+    }
+    if (!localStorage.getItem(this.helpRequestsKey)) {
+      localStorage.setItem(this.helpRequestsKey, JSON.stringify([]));
     }
 
     this.syncFromSupabase();
@@ -325,6 +329,14 @@ class DatabaseService {
 
       if (!eventsError && eventsData && eventsData.length > 0) {
         localStorage.setItem(this.eventsKey, JSON.stringify(eventsData));
+      }
+
+      const { data: helpData, error: helpError } = await supabase
+        .from('help_requests')
+        .select('*');
+
+      if (!helpError && helpData && helpData.length > 0) {
+        localStorage.setItem(this.helpRequestsKey, JSON.stringify(helpData));
       }
     } catch (err) {
       console.warn('Supabase sync warning:', err);
@@ -752,6 +764,160 @@ class DatabaseService {
 
   public clearStorageAfterTest(attemptId: string): void {
     this.clearAttemptDrafts(attemptId);
+  }
+
+  // Help Requests (Need Help Queue)
+  public getHelpRequests(testId?: string): HelpRequest[] {
+    try {
+      const raw = localStorage.getItem(this.helpRequestsKey);
+      const requests: HelpRequest[] = raw ? JSON.parse(raw) : [];
+      if (testId) {
+        return requests.filter(r => r.test_id === testId);
+      }
+      return requests;
+    } catch {
+      return [];
+    }
+  }
+
+  public async requestHelp(payload: {
+    test_id: string;
+    attempt_id: string;
+    student_name: string;
+    student_roll_no: string;
+    question_title?: string;
+  }): Promise<HelpRequest> {
+    const list = this.getHelpRequests();
+    const existingIndex = list.findIndex(
+      r => r.attempt_id === payload.attempt_id && r.status === 'pending'
+    );
+
+    let req: HelpRequest;
+    if (existingIndex >= 0) {
+      req = {
+        ...list[existingIndex],
+        question_title: payload.question_title || list[existingIndex].question_title,
+        requested_at: new Date().toISOString(),
+      };
+      list[existingIndex] = req;
+    } else {
+      req = {
+        id: 'help-' + Math.random().toString(36).substring(2, 9),
+        test_id: payload.test_id,
+        attempt_id: payload.attempt_id,
+        student_name: payload.student_name,
+        student_roll_no: payload.student_roll_no,
+        question_title: payload.question_title,
+        requested_at: new Date().toISOString(),
+        status: 'pending',
+      };
+      list.unshift(req);
+    }
+
+    localStorage.setItem(this.helpRequestsKey, JSON.stringify(list));
+    this.notifyHelpUpdate();
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('help_requests').upsert(req);
+      } catch (err) {
+        console.warn('Supabase help_requests upsert error:', err);
+      }
+    }
+
+    return req;
+  }
+
+  private notifyHelpUpdate(): void {
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('codearena_help_update'));
+        const bc = (window as any).__codearena_help_bc || new BroadcastChannel('codearena_help_channel');
+        (window as any).__codearena_help_bc = bc;
+        bc.postMessage({ type: 'help_update', timestamp: Date.now() });
+      } catch {}
+    }
+  }
+
+  public async cancelHelpRequest(attemptId: string): Promise<void> {
+    const list = this.getHelpRequests().filter(
+      r => !(r.attempt_id === attemptId && r.status === 'pending')
+    );
+    localStorage.setItem(this.helpRequestsKey, JSON.stringify(list));
+    this.notifyHelpUpdate();
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('help_requests')
+          .delete()
+          .eq('attempt_id', attemptId)
+          .eq('status', 'pending');
+      } catch (err) {
+        console.warn('Supabase help_requests delete error:', err);
+      }
+    }
+  }
+
+  public async resolveHelpRequest(id: string): Promise<void> {
+    const list = this.getHelpRequests();
+    const updated = list.map(r => (r.id === id ? { ...r, status: 'resolved' as const } : r));
+    localStorage.setItem(this.helpRequestsKey, JSON.stringify(updated));
+    this.notifyHelpUpdate();
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('help_requests')
+          .update({ status: 'resolved' })
+          .eq('id', id);
+      } catch (err) {
+        console.warn('Supabase help_requests resolve error:', err);
+      }
+    }
+  }
+
+  public async deleteHelpRequest(id: string): Promise<void> {
+    const list = this.getHelpRequests().filter(r => r.id !== id);
+    localStorage.setItem(this.helpRequestsKey, JSON.stringify(list));
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('help_requests')
+          .delete()
+          .eq('id', id);
+      } catch (err) {
+        console.warn('Supabase help_requests delete error:', err);
+      }
+    }
+  }
+
+  public async clearAllHelpRequests(testId?: string): Promise<void> {
+    let list = this.getHelpRequests();
+    if (testId) {
+      list = list.filter(r => r.test_id !== testId);
+    } else {
+      list = [];
+    }
+    localStorage.setItem(this.helpRequestsKey, JSON.stringify(list));
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        if (testId) {
+          await supabase.from('help_requests').delete().eq('test_id', testId);
+        } else {
+          await supabase.from('help_requests').delete().neq('id', '');
+        }
+      } catch (err) {
+        console.warn('Supabase help_requests clear error:', err);
+      }
+    }
+  }
+
+  public isHelpPending(attemptId: string): boolean {
+    const list = this.getHelpRequests();
+    return list.some(r => r.attempt_id === attemptId && r.status === 'pending');
   }
 }
 

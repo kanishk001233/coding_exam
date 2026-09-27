@@ -10,6 +10,7 @@ import { wasmCompiler } from '../lib/wasm/compiler';
 import { TestJudge } from '../lib/judge/testRunner';
 import { compareOutputs } from '../lib/judge/outputCompare';
 import { mockDb } from '../lib/mockDb';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { ShieldAlert, Maximize2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ModalDialog } from '../components/ModalDialog';
 
@@ -69,6 +70,85 @@ export const StudentTest: React.FC<StudentTestProps> = ({
   const [studentLatestSubmissions, setStudentLatestSubmissions] = useState<Submission[]>(() =>
     mockDb.getLatestSubmissions(attempt.id)
   );
+
+  // Classroom Offline Help Request State
+  const [isHelpRequested, setIsHelpRequested] = useState<boolean>(() =>
+    mockDb.isHelpPending(attempt.id)
+  );
+  const [helpToast, setHelpToast] = useState<string | null>(null);
+
+  // Instant real-time listener for help request resolution
+  useEffect(() => {
+    const checkHelpStatus = () => {
+      const isPending = mockDb.isHelpPending(attempt.id);
+      setIsHelpRequested(isPending);
+    };
+
+    // 1. Local instant BroadcastChannel & CustomEvent listeners
+    window.addEventListener('codearena_help_update', checkHelpStatus);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        bc = new BroadcastChannel('codearena_help_channel');
+        bc.onmessage = () => {
+          checkHelpStatus();
+        };
+      } catch {}
+    }
+
+    // 2. Supabase Realtime WebSocket listener
+    let supabaseChannel: any = null;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        supabaseChannel = supabase
+          .channel(`student-help-${attempt.id}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'help_requests', filter: `attempt_id=eq.${attempt.id}` },
+            async () => {
+              await mockDb.syncFromSupabase();
+              checkHelpStatus();
+            }
+          )
+          .subscribe();
+      } catch (err) {
+        console.warn('Realtime subscription error on student test:', err);
+      }
+    }
+
+    // 3. Background interval fallback
+    const interval = setInterval(checkHelpStatus, 2000);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('codearena_help_update', checkHelpStatus);
+      if (bc) bc.close();
+      if (supabaseChannel && supabase) {
+        supabase.removeChannel(supabaseChannel);
+      }
+    };
+  }, [attempt.id]);
+
+  const handleToggleNeedHelp = async () => {
+    if (isHelpRequested) {
+      await mockDb.cancelHelpRequest(attempt.id);
+      setIsHelpRequested(false);
+      setHelpToast('Help request cancelled.');
+      setTimeout(() => setHelpToast(null), 3000);
+    } else {
+      await mockDb.requestHelp({
+        test_id: test.id,
+        attempt_id: attempt.id,
+        student_name: attempt.student_name || 'Student',
+        student_roll_no: attempt.student_roll_no || '',
+        question_title: activeQuestion ? `Q${currentQuestionIndex + 1}: ${activeQuestion.title}` : undefined,
+      });
+      setIsHelpRequested(true);
+      setHelpToast('🙋 Instructor has been notified! Please stay seated.');
+      setTimeout(() => setHelpToast(null), 4000);
+    }
+  };
 
   useEffect(() => {
     setSampleResults(null);
@@ -283,10 +363,21 @@ export const StudentTest: React.FC<StudentTestProps> = ({
         isSaving={isSaving}
         lastSavedTime={lastSavedTime}
         tabSwitchCount={tabSwitchCount}
+        isHelpRequested={isHelpRequested}
+        onToggleNeedHelp={handleToggleNeedHelp}
         onEnterFullscreen={enterFullscreen}
         onFinishTest={() => setShowFinishConfirm(true)}
         onExpireTimer={handleExpireTimer}
       />
+
+      {/* Help Requested Toast Notification */}
+      {helpToast && (
+        <div className="fixed top-14 right-4 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="px-4 py-2.5 rounded-xl bg-amber-500 text-white font-bold text-xs shadow-xl shadow-amber-500/25 flex items-center gap-2 border border-amber-400">
+            <span>{helpToast}</span>
+          </div>
+        </div>
+      )}
 
       {/* Main Container with Left Sidebar */}
       <div className="flex flex-1 min-h-0 overflow-hidden">

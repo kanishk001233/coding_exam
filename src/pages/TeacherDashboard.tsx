@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Test, TestAttempt, Question, TestCase } from '../types/database';
+import { Test, TestAttempt, Question, TestCase, HelpRequest } from '../types/database';
 import { mockDb } from '../lib/mockDb';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { StudentList } from '../components/StudentList';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
-import { Plus, Play, Pause, BarChart2, BookOpen, Clock, Users, Key, LogOut, Trash2, Edit3, Code2, Eye, EyeOff, ShieldAlert, Maximize2 } from 'lucide-react';
+import { Plus, Play, Pause, BarChart2, BookOpen, Clock, Users, Key, LogOut, Trash2, Edit3, Code2, Eye, EyeOff, ShieldAlert, Maximize2, Hand, MessageSquare, Check, X, Bell, HelpCircle, CheckCircle2 } from 'lucide-react';
 
 interface TeacherDashboardProps {
   user: { id: string; name: string; email: string };
@@ -34,6 +34,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [attempts, setAttempts] = useState<TestAttempt[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Classroom Assistance Help Queue State
+  const [helpRequests, setHelpRequests] = useState<HelpRequest[]>(() => mockDb.getHelpRequests());
+  const [isHelpDrawerOpen, setIsHelpDrawerOpen] = useState(false);
+
   // Dialog States
   const [testToDelete, setTestToDelete] = useState<Test | null>(null);
   const [bankQToDelete, setBankQToDelete] = useState<string | null>(null);
@@ -44,6 +48,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [editingBankQ, setEditingBankQ] = useState<Omit<Question, 'test_id'> | null>(null);
   const [showBankModal, setShowBankModal] = useState(false);
 
+  const fetchHelpRequests = () => {
+    setHelpRequests(mockDb.getHelpRequests());
+  };
+
   const fetchLiveAttempts = async () => {
     await mockDb.syncFromSupabase();
     const updatedTests = mockDb.getTests();
@@ -52,6 +60,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     if (activeId) {
       setAttempts(mockDb.getAttempts(activeId));
     }
+    fetchHelpRequests();
   };
 
   const handleManualRefresh = async () => {
@@ -60,12 +69,28 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
+  const handleResolveHelp = async (id: string) => {
+    await mockDb.resolveHelpRequest(id);
+    fetchHelpRequests();
+  };
+
+  const handleDeleteHelp = async (id: string) => {
+    await mockDb.deleteHelpRequest(id);
+    fetchHelpRequests();
+  };
+
+  const handleClearAllHelp = async () => {
+    await mockDb.clearAllHelpRequests();
+    fetchHelpRequests();
+  };
+
   useEffect(() => {
     const refreshData = async () => {
       await mockDb.syncFromSupabase();
       const refreshedTests = mockDb.getTests();
       setTests(refreshedTests);
       setBankQuestions(mockDb.getQuestionBank());
+      fetchHelpRequests();
       const currentTestId = selectedTestId || refreshedTests[0]?.id || '';
       if (!selectedTestId && refreshedTests.length > 0) {
         setSelectedTestId(refreshedTests[0].id);
@@ -77,11 +102,68 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
     refreshData();
 
+    // 1. Instant local BroadcastChannel & CustomEvent listeners (0ms instant sync)
+    const handleInstantHelpUpdate = () => {
+      fetchHelpRequests();
+    };
+
+    window.addEventListener('codearena_help_update', handleInstantHelpUpdate);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        bc = new BroadcastChannel('codearena_help_channel');
+        bc.onmessage = () => {
+          fetchHelpRequests();
+        };
+      } catch {}
+    }
+
+    // 2. Supabase Realtime WebSockets (< 100ms instant remote sync)
+    let supabaseChannel: any = null;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        supabaseChannel = supabase
+          .channel('codearena-dashboard-live')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'help_requests' },
+            async () => {
+              await mockDb.syncFromSupabase();
+              fetchHelpRequests();
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'test_attempts' },
+            async () => {
+              await mockDb.syncFromSupabase();
+              const refreshed = mockDb.getTests();
+              setTests(refreshed);
+              if (selectedTestId) {
+                setAttempts(mockDb.getAttempts(selectedTestId));
+              }
+            }
+          )
+          .subscribe();
+      } catch (err) {
+        console.warn('Realtime subscription error:', err);
+      }
+    }
+
+    // 3. Fast fallback interval polling (1.5s)
     const interval = setInterval(async () => {
       await fetchLiveAttempts();
     }, 1500);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('codearena_help_update', handleInstantHelpUpdate);
+      if (bc) bc.close();
+      if (supabaseChannel && supabase) {
+        supabase.removeChannel(supabaseChannel);
+      }
+    };
   }, [selectedTestId]);
 
   const selectedTest = tests.find((t) => t.id === selectedTestId) || tests[0];
@@ -248,6 +330,26 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Help Queue Trigger Button */}
+          <button
+            type="button"
+            onClick={() => setIsHelpDrawerOpen(true)}
+            className={`relative flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-sm ${
+              helpRequests.filter(r => r.status === 'pending').length > 0
+                ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30 animate-pulse border border-amber-400'
+                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700'
+            }`}
+            title="Open Student Offline Help Queue"
+          >
+            <Hand className="w-4 h-4" />
+            <span className="hidden sm:inline">Help Queue</span>
+            {helpRequests.filter(r => r.status === 'pending').length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black border border-white dark:border-slate-900">
+                {helpRequests.filter(r => r.status === 'pending').length}
+              </span>
+            )}
+          </button>
+
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-800">
             <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500' : 'bg-amber-500 animate-ping'}`} />
             <span className="text-slate-600 dark:text-slate-400">
@@ -919,6 +1021,182 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           onClose={() => setDialogAlert(null)}
         />
       </div>
+
+      {/* Floating Chat-Style Help Queue Mini Action Button (Bottom Right) */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          type="button"
+          onClick={() => setIsHelpDrawerOpen(true)}
+          className={`relative p-3.5 sm:p-4 rounded-full text-white shadow-2xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer ${
+            helpRequests.filter(r => r.status === 'pending').length > 0
+              ? 'bg-gradient-to-tr from-amber-500 to-rose-500 shadow-amber-500/40 ring-4 ring-amber-400/30 animate-bounce'
+              : 'bg-gradient-to-tr from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-indigo-600/30'
+          }`}
+          title="Student Help Queue (Click to open)"
+        >
+          <Hand className="w-6 h-6" />
+          {helpRequests.filter(r => r.status === 'pending').length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[24px] h-[24px] px-1 rounded-full bg-rose-600 text-white text-xs font-black flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-lg">
+              {helpRequests.filter(r => r.status === 'pending').length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Slide-Over Help Queue Drawer */}
+      {isHelpDrawerOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden select-none">
+          {/* Backdrop */}
+          <div
+            onClick={() => setIsHelpDrawerOpen(false)}
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+          />
+
+          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+            <div className="w-screen max-w-md bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+              {/* Drawer Header */}
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-950/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center shadow-lg shadow-amber-500/25">
+                    <Hand className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-black text-slate-900 dark:text-white">
+                        Student Help Queue
+                      </h2>
+                      {helpRequests.filter(r => r.status === 'pending').length > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-500/40 text-amber-800 dark:text-amber-300 text-[11px] font-bold">
+                          {helpRequests.filter(r => r.status === 'pending').length} Waiting
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Live offline assistance requests
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsHelpDrawerOpen(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                  title="Close Queue"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Queue Controls Bar */}
+              <div className="px-5 py-2.5 bg-slate-100/70 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-slate-400 font-semibold">
+                  Queue Order (First Come, First Served)
+                </span>
+                {helpRequests.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllHelp}
+                    className="text-rose-600 dark:text-rose-400 hover:underline text-[11px] font-bold cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+
+              {/* Drawer Body List */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-3.5">
+                {helpRequests.filter(r => r.status === 'pending').length === 0 ? (
+                  <div className="text-center py-16 px-4 space-y-4">
+                    <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="w-8 h-8" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                        All Clear! No Pending Requests
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
+                        When offline students click the <strong>"Need Help?"</strong> button at their desks, their names and active questions will appear here instantly.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  helpRequests
+                    .filter(r => r.status === 'pending')
+                    .map((req, idx) => {
+                      const diffMs = Date.now() - new Date(req.requested_at).getTime();
+                      const diffMin = Math.floor(diffMs / 60000);
+                      const timeText = diffMin < 1 ? 'Just now' : `${diffMin}m ago`;
+
+                      return (
+                        <div
+                          key={req.id}
+                          className="bg-white dark:bg-slate-950 border-2 border-amber-400 dark:border-amber-500/50 rounded-2xl p-4 shadow-lg space-y-3 relative overflow-hidden animate-in fade-in slide-in-from-right duration-200"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-black flex items-center justify-center shrink-0">
+                                {idx + 1}
+                              </span>
+                              <div>
+                                <h4 className="text-sm font-black text-slate-900 dark:text-white leading-tight">
+                                  {req.student_name}
+                                </h4>
+                                <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                  <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                                    UID: {req.student_roll_no}
+                                  </span>
+                                  <span>•</span>
+                                  <span>{timeText}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteHelp(req.id)}
+                              className="text-slate-400 hover:text-rose-500 p-1 transition-colors"
+                              title="Dismiss Request"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {req.question_title && (
+                            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-0.5">
+                                Active Problem
+                              </span>
+                              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                                {req.question_title}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Action Button: Cut from queue / Mark assisted */}
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleResolveHelp(req.id)}
+                              className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 transition-all active:scale-95 cursor-pointer"
+                            >
+                              <Check className="w-4 h-4" />
+                              <span>Cut from Queue (Assisted)</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-center text-xs text-slate-500 dark:text-slate-400">
+                <span>Real-time classroom assistance queue</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
