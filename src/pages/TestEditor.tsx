@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Test, Question, TestCase } from '../types/database';
 import { mockDb } from '../lib/mockDb';
-import { ArrowLeft, Plus, Trash2, Save, Eye, EyeOff, Code2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Eye, EyeOff, Code2, ShieldCheck, Loader2 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
 
@@ -13,6 +13,7 @@ interface TestEditorProps {
 
 export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }) => {
   const [currentTest, setCurrentTest] = useState<Test>({ ...test });
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [enableTabSwitchTracking, setEnableTabSwitchTracking] = useState<boolean>(
     test.enable_tab_switch_tracking !== false
   );
@@ -120,21 +121,41 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
   };
 
   const handleSaveAll = async () => {
-    const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
-    const updated: Test = {
-      ...currentTest,
-      questions,
-      total_marks: totalMarks,
-      enable_tab_switch_tracking: enableTabSwitchTracking,
-      enable_fullscreen_mode: enableFullscreenMode,
-    };
+    setIsSaving(true);
+    try {
+      const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+      const updated: Test = {
+        ...currentTest,
+        questions,
+        total_marks: totalMarks,
+        enable_tab_switch_tracking: enableTabSwitchTracking,
+        enable_fullscreen_mode: enableFullscreenMode,
+      };
 
-    await mockDb.saveTest(updated);
-    onSave(updated);
+      await mockDb.saveTest(updated);
+      onSave(updated);
+    } catch (err) {
+      console.error('Failed to save test changes:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 font-sans transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 font-sans transition-colors relative">
+      {/* Loading Overlay */}
+      {isSaving && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-3 text-center animate-in zoom-in-95 duration-150">
+            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+            <div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">Saving Test Changes</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Updating questions, constraints, and test cases...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
@@ -155,11 +176,21 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
             <ThemeToggle />
             <button
               type="button"
+              disabled={isSaving}
               onClick={handleSaveAll}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all active:scale-95"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all active:scale-95"
             >
-              <Save className="w-4 h-4" />
-              <span>Save All Changes</span>
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>Saving All Changes...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Save All Changes</span>
+                </>
+              )}
             </button>
           </div>
         </div>

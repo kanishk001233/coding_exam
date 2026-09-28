@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Test, Question, TestCase } from '../types/database';
 import { mockDb } from '../lib/mockDb';
-import { ArrowLeft, Check, RefreshCw, Plus, Trash2, Eye, EyeOff, Code2, Upload, FileSpreadsheet, Download, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Check, RefreshCw, Plus, Trash2, Eye, EyeOff, Code2, Upload, FileSpreadsheet, Download, ShieldCheck, Loader2 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
 import { downloadSampleCSVTemplate, parseCSVToQuestions } from '../lib/csvHelper';
@@ -19,6 +19,7 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
   const [status, setStatus] = useState<'draft' | 'scheduled' | 'live'>('live');
   const [enableTabSwitchTracking, setEnableTabSwitchTracking] = useState(true);
   const [enableFullscreenMode, setEnableFullscreenMode] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Dialog State
   const [validationAlert, setValidationAlert] = useState<{ title: string; message: string } | null>(null);
@@ -258,12 +259,32 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
       enable_fullscreen_mode: enableFullscreenMode,
     };
 
-    await mockDb.saveTest(newTest);
-    onSave(newTest);
+    setIsSaving(true);
+    try {
+      await mockDb.saveTest(newTest);
+      onSave(newTest);
+    } catch (err) {
+      console.error('Failed to create test:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 sm:p-10 font-sans transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 sm:p-10 font-sans transition-colors relative">
+      {/* Loading Overlay */}
+      {isSaving && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-3 text-center animate-in zoom-in-95 duration-150">
+            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+            <div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">Publishing Test</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Creating test session and setting up questions...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
@@ -590,9 +611,17 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all active:scale-95"
+              disabled={isSaving}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all active:scale-95"
             >
-              Create & Publish Test ({customQuestions.length + selectedBankQuestionIds.length} Questions)
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>Creating Test...</span>
+                </>
+              ) : (
+                <span>Create & Publish Test ({customQuestions.length + selectedBankQuestionIds.length} Questions)</span>
+              )}
             </button>
           </div>
         </form>

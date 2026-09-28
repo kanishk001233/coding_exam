@@ -5,7 +5,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { StudentList } from '../components/StudentList';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
-import { Plus, Play, Pause, BarChart2, BookOpen, Clock, Users, Key, LogOut, Trash2, Edit3, Code2, Eye, EyeOff, ShieldAlert, Maximize2, Hand, MessageSquare, Check, X, Bell, HelpCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, Play, Pause, BarChart2, BookOpen, Clock, Users, Key, LogOut, Trash2, Edit3, Code2, Eye, EyeOff, ShieldAlert, Maximize2, Hand, MessageSquare, Check, X, Bell, HelpCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface TeacherDashboardProps {
   user: { id: string; name: string; email: string };
@@ -47,6 +47,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [bankQuestions, setBankQuestions] = useState<Omit<Question, 'test_id'>[]>(() => mockDb.getQuestionBank());
   const [editingBankQ, setEditingBankQ] = useState<Omit<Question, 'test_id'> | null>(null);
   const [showBankModal, setShowBankModal] = useState(false);
+  const [isSavingBankQ, setIsSavingBankQ] = useState(false);
 
   const fetchHelpRequests = () => {
     setHelpRequests(mockDb.getHelpRequests());
@@ -296,7 +297,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     setBankQToDelete(null);
   };
 
-  const handleSaveBankQuestion = () => {
+  const handleSaveBankQuestion = async () => {
     if (!editingBankQ || !editingBankQ.title.trim()) {
       setDialogAlert({
         title: 'Validation Error',
@@ -305,10 +306,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       return;
     }
 
-    const updated = mockDb.saveQuestionBankQuestion(editingBankQ);
-    setBankQuestions(updated);
-    setShowBankModal(false);
-    setEditingBankQ(null);
+    setIsSavingBankQ(true);
+    try {
+      const updated = await mockDb.saveQuestionBankQuestion(editingBankQ);
+      setBankQuestions(updated);
+      setShowBankModal(false);
+      setEditingBankQ(null);
+    } catch (err) {
+      console.error('Failed to save bank question:', err);
+    } finally {
+      setIsSavingBankQ(false);
+    }
   };
 
   return (
@@ -974,10 +982,18 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </button>
                 <button
                   type="button"
+                  disabled={isSavingBankQ}
                   onClick={handleSaveBankQuestion}
-                  className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md"
+                  className="flex items-center gap-2 px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold shadow-md transition-all active:scale-95"
                 >
-                  Save to Question Bank
+                  {isSavingBankQ ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving Problem...</span>
+                    </>
+                  ) : (
+                    <span>Save to Question Bank</span>
+                  )}
                 </button>
               </div>
             </div>
