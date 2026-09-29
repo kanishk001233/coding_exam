@@ -320,6 +320,13 @@ export function parseCSVToQuestions(csvText: string): Question[] {
       });
     }
 
+    const imageUrl =
+      getCol(row, 'image_url') ||
+      getCol(row, 'image') ||
+      getCol(row, 'gif_url') ||
+      getCol(row, 'media_url') ||
+      '';
+
     const question: Question = {
       id: `q-csv-${r}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       test_id: '',
@@ -333,6 +340,7 @@ export function parseCSVToQuestions(csvText: string): Question[] {
       starter_code: starterCode,
       time_limit_ms: 2000,
       memory_limit_mb: 64,
+      image_url: imageUrl.trim() || undefined,
       question_order: r,
       test_cases: testCases,
     };

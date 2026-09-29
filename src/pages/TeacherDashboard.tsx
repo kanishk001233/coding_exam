@@ -5,6 +5,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { StudentList } from '../components/StudentList';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
+import { QuestionMediaUpload } from '../components/QuestionMediaUpload';
 import { Plus, Play, Pause, BarChart2, BookOpen, Clock, Users, Key, LogOut, Trash2, Edit3, Code2, Eye, EyeOff, ShieldAlert, Maximize2, Hand, MessageSquare, Check, X, Bell, HelpCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -799,6 +800,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none font-sans"
                   />
                 </div>
+
+                {/* Problem Diagram / Media Upload */}
+                <QuestionMediaUpload
+                  imageUrl={editingBankQ.image_url || ''}
+                  onChange={(url) => setEditingBankQ({ ...editingBankQ, image_url: url })}
+                />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">

@@ -54,6 +54,7 @@ CREATE TABLE questions (
   time_limit_ms INTEGER NOT NULL DEFAULT 2000,
   memory_limit_mb INTEGER NOT NULL DEFAULT 64,
   question_order INTEGER NOT NULL DEFAULT 1,
+  image_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

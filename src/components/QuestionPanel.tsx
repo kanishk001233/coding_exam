@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Question } from '../types/database';
-import { Code2, AlertCircle, Copy, Check, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Code2, AlertCircle, Copy, Check, ChevronRight, ChevronLeft, Image as ImageIcon, Maximize2, X } from 'lucide-react';
 
 interface QuestionPanelProps {
   question: Question;
@@ -24,6 +24,7 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
   isNavigationDisabled = false,
 }) => {
   const [copiedIndex, setCopiedIndex] = React.useState<number | null>(null);
+  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
 
   const sampleCases = (question.test_cases || []).filter((tc) => tc.is_sample);
 
@@ -47,7 +48,7 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-xl transition-colors">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-xl transition-colors relative">
       {/* Header */}
       <div className="px-5 py-3.5 bg-slate-100 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -86,13 +87,52 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
       {/* Content Scroll Area */}
       <div className="flex-1 overflow-y-auto p-5 space-y-6 text-sm text-slate-700 dark:text-slate-300">
         {/* Description */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Problem Statement
           </h3>
           <p className="text-slate-900 dark:text-slate-200 leading-relaxed whitespace-pre-line font-sans">
             {question.description}
           </p>
+
+          {/* Question Media / Image / GIF */}
+          {question.image_url && (
+            <div className="pt-2">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>Diagram / Illustration</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsMediaModalOpen(true)}
+                    className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Maximize2 className="w-3 h-3" />
+                    <span>Enlarge</span>
+                  </button>
+                </div>
+
+                <div
+                  onClick={() => setIsMediaModalOpen(true)}
+                  className="rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900 cursor-pointer group relative flex items-center justify-center p-2 max-h-80 hover:border-indigo-400 transition-colors"
+                  title="Click to expand full image/GIF"
+                >
+                  <img
+                    src={question.image_url}
+                    alt={question.title || 'Problem diagram'}
+                    className="max-h-72 w-auto object-contain rounded transition-transform duration-200 group-hover:scale-[1.01]"
+                  />
+                  <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/10 transition-colors flex items-center justify-center pointer-events-none">
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity px-2.5 py-1 rounded-full bg-slate-900/80 text-white text-[11px] font-medium shadow-md flex items-center gap-1">
+                      <Maximize2 className="w-3 h-3" /> Click to Zoom
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Input / Output Format */}
@@ -197,6 +237,53 @@ export const QuestionPanel: React.FC<QuestionPanelProps> = ({
           )}
         </div>
       </div>
+
+      {/* Media Lightbox Modal */}
+      {isMediaModalOpen && question.image_url && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setIsMediaModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-4xl max-h-[90vh] w-full p-4 flex flex-col shadow-2xl relative overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm text-slate-900 dark:text-white">
+                  {question.title} - Diagram
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMediaModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center min-h-[300px]">
+              <img
+                src={question.image_url}
+                alt={question.title || 'Question illustration'}
+                className="max-h-[75vh] w-auto max-w-full object-contain rounded-lg"
+              />
+            </div>
+
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span>Press anywhere outside or click close button to dismiss</span>
+              <button
+                type="button"
+                onClick={() => setIsMediaModalOpen(false)}
+                className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

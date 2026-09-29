@@ -436,6 +436,7 @@ class DatabaseService {
               time_limit_ms: q.time_limit_ms,
               memory_limit_mb: q.memory_limit_mb,
               question_order: q.question_order,
+              image_url: q.image_url || null,
             });
 
             if (qErr) {

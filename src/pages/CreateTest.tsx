@@ -4,6 +4,7 @@ import { mockDb } from '../lib/mockDb';
 import { ArrowLeft, Check, RefreshCw, Plus, Trash2, Eye, EyeOff, Code2, Upload, FileSpreadsheet, Download, ShieldCheck, Loader2 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
+import { QuestionMediaUpload } from '../components/QuestionMediaUpload';
 import { downloadSampleCSVTemplate, parseCSVToQuestions } from '../lib/csvHelper';
 
 interface CreateTestProps {
@@ -44,6 +45,7 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
   // New Custom Question Form State
   const [newQTitle, setNewQTitle] = useState('');
   const [newQDesc, setNewQDesc] = useState('');
+  const [newQImageUrl, setNewQImageUrl] = useState('');
   const [newQDifficulty, setNewQDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [newQMarks, setNewQMarks] = useState(10);
   const [newQInputFormat, setNewQInputFormat] = useState('');
@@ -160,6 +162,7 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
       marks: Number(newQMarks) || 10,
       time_limit_ms: 2000,
       memory_limit_mb: 64,
+      image_url: newQImageUrl.trim() || undefined,
       question_order: customQuestions.length + 1,
       test_cases: newQTestCases.map((tc) => ({
         ...tc,
@@ -172,6 +175,7 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
     // Reset Form
     setNewQTitle('');
     setNewQDesc('');
+    setNewQImageUrl('');
     setNewQInputFormat('');
     setNewQOutputFormat('');
     setNewQConstraints('1 <= N <= 10^5');
@@ -727,6 +731,12 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none font-sans"
                   />
                 </div>
+
+                {/* Problem Diagram / Media Upload */}
+                <QuestionMediaUpload
+                  imageUrl={newQImageUrl}
+                  onChange={setNewQImageUrl}
+                />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">

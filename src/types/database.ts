@@ -47,6 +47,7 @@ export interface Question {
   time_limit_ms: number;
   memory_limit_mb: number;
   question_order: number;
+  image_url?: string;
   test_cases?: TestCase[];
   created_at?: string;
 }
