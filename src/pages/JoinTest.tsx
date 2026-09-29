@@ -153,7 +153,7 @@ export const JoinTest: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex selection:bg-indigo-500 selection:text-white font-sans transition-colors">
+    <div className="min-h-screen bg-white dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 flex selection:bg-indigo-500 selection:text-white font-sans transition-colors">
       {/* LEFT HERO PANEL (Split-screen on md/lg screens) */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-700 via-indigo-700 to-indigo-900 text-white p-12 xl:p-16 flex-col justify-between relative overflow-hidden">
         {/* Subtle geometric line curves in background */}
@@ -164,13 +164,6 @@ export const JoinTest: React.FC = () => {
             <path d="M-100,500 C150,300 400,600 700,400" stroke="white" strokeWidth="2" />
             <path d="M-50,600 C200,400 450,700 750,500" stroke="white" strokeWidth="1.5" strokeDasharray="8 8" />
           </svg>
-        </div>
-
-        {/* Top Icon Badge */}
-        <div className="relative z-10">
-          <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-xl shadow-indigo-950/40">
-            <Sparkles className="w-7 h-7 text-white" />
-          </div>
         </div>
 
         {/* Center Main Headline & Typewriter Quote */}
@@ -211,7 +204,7 @@ export const JoinTest: React.FC = () => {
             <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
               Welcome Student!
             </h2>
-            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+            <p className="text-sm sm:text-base text-slate-500 dark:text-zinc-400 leading-relaxed font-medium">
               Enter your assessment join code and student credentials below.
             </p>
           </div>
@@ -227,7 +220,7 @@ export const JoinTest: React.FC = () => {
             {/* Assessment Join Code */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-bold text-slate-700 dark:text-zinc-300">
                   Assessment Join Code *
                 </label>
                 {selectedTest && (
@@ -246,14 +239,14 @@ export const JoinTest: React.FC = () => {
                   value={testCode}
                   onChange={(e) => handleTestCodeChange(e.target.value)}
                   placeholder="e.g. C2026A"
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-base font-mono uppercase font-bold tracking-widest text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-60"
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl text-base font-mono uppercase font-bold tracking-widest text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-60"
                 />
               </div>
             </div>
 
             {/* Student Full Name */}
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+              <label className="text-sm font-bold text-slate-700 dark:text-zinc-300">
                 Student Full Name *
               </label>
               <div className="relative">
@@ -265,14 +258,14 @@ export const JoinTest: React.FC = () => {
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
                   placeholder="e.g. Rahul Sharma"
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm sm:text-base font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-60"
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl text-sm sm:text-base font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-60"
                 />
               </div>
             </div>
 
             {/* Student UID */}
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+              <label className="text-sm font-bold text-slate-700 dark:text-zinc-300">
                 Student UID / Roll No *
               </label>
               <div className="relative">
@@ -284,7 +277,7 @@ export const JoinTest: React.FC = () => {
                   value={rollNo}
                   onChange={(e) => setRollNo(e.target.value)}
                   placeholder="e.g. 26BCS10145"
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm sm:text-base font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all uppercase disabled:opacity-60"
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl text-sm sm:text-base font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all uppercase disabled:opacity-60"
                 />
               </div>
             </div>
@@ -301,7 +294,7 @@ export const JoinTest: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs sm:text-sm text-slate-600 dark:text-slate-400 pt-2 border-t border-indigo-200/60 dark:border-indigo-800/40">
+                <div className="flex items-center justify-between text-xs sm:text-sm text-slate-600 dark:text-zinc-400 pt-2 border-t border-indigo-200/60 dark:border-indigo-800/40">
                   <span className="flex items-center gap-1.5 font-semibold">
                     <Clock className="w-4 h-4 text-indigo-500" />
                     {selectedTest.duration_minutes} Mins
@@ -340,7 +333,7 @@ export const JoinTest: React.FC = () => {
 
           {/* Anti-cheat guidelines note */}
           <div className="pt-1 text-center">
-            <p className="text-xs text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1.5">
+            <p className="text-xs text-slate-400 dark:text-zinc-500 flex items-center justify-center gap-1.5">
               <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
               <span>Fullscreen mode & tab switch integrity monitoring enabled</span>
             </p>
@@ -348,7 +341,7 @@ export const JoinTest: React.FC = () => {
         </div>
 
         {/* Bottom Helper Bar */}
-        <div className="text-center text-xs text-slate-400 dark:text-slate-600 pt-4 border-t border-slate-100 dark:border-slate-900">
+        <div className="text-center text-xs text-slate-400 dark:text-zinc-600 pt-4 border-t border-slate-100 dark:border-zinc-800">
           <span>Need help joining? Contact your course instructor or assessment invigilator.</span>
         </div>
       </div>

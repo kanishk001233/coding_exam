@@ -7,10 +7,12 @@ import { StudentList } from '../components/StudentList';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
 import { QuestionMediaUpload } from '../components/QuestionMediaUpload';
+import { AlgorithmEditor } from '../components/AlgorithmEditor';
+import handRaiseIcon from '../5721257.png';
 import {
   Plus, Play, Pause, BarChart2, BookOpen, Clock, Users, Key, LogOut, Trash2, Edit3,
   Code2, Eye, EyeOff, ShieldAlert, Maximize2, Hand, MessageSquare, Check, X, Bell,
-  HelpCircle, CheckCircle2, Loader2, Search, Copy, CheckCheck, Sparkles, Filter,
+  HelpCircle, CheckCircle2, Loader2, Search, Copy, CopyPlus, CheckCheck, Sparkles, Filter,
   AlertCircle, Share2, Layers, ChevronRight, Activity, Terminal, Shield, Volume2
 } from 'lucide-react';
 
@@ -120,6 +122,31 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const handleDeleteHelp = async (id: string) => {
     await mockDb.deleteHelpRequest(id);
     fetchHelpRequests();
+  };
+
+  const [isDuplicatingId, setIsDuplicatingId] = useState<string | null>(null);
+
+  const handleDuplicateTest = async (test: Test, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      setIsDuplicatingId(test.id);
+      const cloned = await mockDb.duplicateTest(test.id, test);
+      if (cloned) {
+        setTests(mockDb.getTests());
+        setDialogAlert({
+          title: 'Assessment Duplicated',
+          message: `Successfully duplicated "${test.title}" as "${cloned.title}" with Join Code "${cloned.join_code}". All ${cloned.questions?.length || 0} question(s), testcases, and images have been copied.`,
+        });
+      }
+    } catch (err) {
+      console.error('Duplicate test error:', err);
+      setDialogAlert({
+        title: 'Duplication Failed',
+        message: 'An unexpected error occurred while duplicating the assessment. Please try again.',
+      });
+    } finally {
+      setIsDuplicatingId(null);
+    }
   };
 
   const handleClearAllHelp = async () => {
@@ -405,9 +432,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const pendingHelpCount = helpRequests.filter((r) => r.status === 'pending').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 font-sans transition-colors selection:bg-indigo-500 selection:text-white">
       {/* Top Navbar */}
-      <nav className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-30 shadow-xs">
+      <nav className="bg-white/90 dark:bg-[#121214]/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-zinc-800/80 sticky top-0 z-30 shadow-xs">
         {/* Top Decorative Gradient Accent */}
         <div className="h-[3px] w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600" />
 
@@ -426,7 +453,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   Instructor
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
+              <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium flex items-center gap-1.5">
                 <span>Assessment Command Center</span>
               </p>
             </div>
@@ -441,11 +468,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               className={`relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs ${
                 pendingHelpCount > 0
                   ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-amber-500/30 ring-2 ring-amber-400/40 animate-pulse'
-                  : 'bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80'
+                  : 'bg-slate-100 dark:bg-[#18181b]/90 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700/80'
               }`}
               title="Open Student Offline Help Queue"
             >
-              <Hand className="w-4 h-4" />
+              <img src={handRaiseIcon} alt="Help Queue" className="w-4 h-4 object-contain" />
               <span className="hidden md:inline">Help Queue</span>
               {pendingHelpCount > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full bg-white text-rose-600 text-[11px] font-black shadow-xs">
@@ -455,21 +482,21 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             </button>
 
             {/* Database Connection Pill */}
-            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium border bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-800">
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium border bg-slate-100/80 dark:bg-[#18181b]/60 border-slate-200 dark:border-zinc-800">
               <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-amber-500 animate-ping'}`} />
-              <span className="text-slate-600 dark:text-slate-300">
+              <span className="text-slate-600 dark:text-zinc-300">
                 {isSupabaseConfigured ? 'Database Synced' : 'Local Storage Mode'}
               </span>
             </div>
 
             {/* User Profile Pill */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/70 dark:bg-[#18181b]/60 border border-slate-200/80 dark:border-zinc-800">
               <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold uppercase">
                 {user.name ? user.name[0] : 'T'}
               </div>
               <div className="text-left">
-                <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 leading-none">{user.name}</span>
-                <span className="block text-[10px] text-slate-400 dark:text-slate-500 leading-none mt-0.5">{user.email}</span>
+                <span className="block text-xs font-bold text-slate-800 dark:text-zinc-200 leading-none">{user.name}</span>
+                <span className="block text-[10px] text-slate-400 dark:text-zinc-500 leading-none mt-0.5">{user.email}</span>
               </div>
             </div>
 
@@ -478,7 +505,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <button
               type="button"
               onClick={onNavigateDiagnostics}
-              className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors hidden lg:flex items-center gap-1.5 border border-slate-200 dark:border-slate-700/60 cursor-pointer"
+              className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-[#18181b] hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 text-xs font-semibold transition-colors hidden lg:flex items-center gap-1.5 border border-slate-200 dark:border-zinc-700/60 cursor-pointer"
             >
               <Activity className="w-3.5 h-3.5 text-indigo-500" />
               <span>Benchmark</span>
@@ -496,7 +523,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <button
               type="button"
               onClick={onLogout}
-              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-500 dark:text-slate-400 transition-colors border border-slate-200 dark:border-slate-700/60 cursor-pointer"
+              className="p-2 rounded-xl bg-slate-100 dark:bg-[#18181b] hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-500 dark:text-zinc-400 transition-colors border border-slate-200 dark:border-zinc-700/60 cursor-pointer"
               title="Sign Out"
             >
               <LogOut className="w-4 h-4" />
@@ -509,9 +536,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       <div className="max-w-7xl mx-auto p-5 sm:p-8 space-y-7">
         {/* Top KPI Metrics Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-white dark:bg-[#121214] border border-slate-200/80 dark:border-zinc-800 shadow-sm flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
                 Total Assessments
               </p>
               <div className="flex items-baseline gap-2">
@@ -528,9 +555,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-white dark:bg-[#121214] border border-slate-200/80 dark:border-zinc-800 shadow-sm flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
                 Total Submissions
               </p>
               <div className="flex items-baseline gap-2">
@@ -543,9 +570,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-white dark:bg-[#121214] border border-slate-200/80 dark:border-zinc-800 shadow-sm flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
                 Question Bank
               </p>
               <div className="flex items-baseline gap-2">
@@ -563,11 +590,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             className={`p-4 rounded-2xl border shadow-sm flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02] ${
               pendingHelpCount > 0
                 ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-500/40 ring-2 ring-amber-400/20'
-                : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800'
+                : 'bg-white dark:bg-[#121214] border-slate-200/80 dark:border-zinc-800'
             }`}
           >
             <div className="space-y-1">
-              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
                 Help Queue
               </p>
               <div className="flex items-baseline gap-2">
@@ -579,31 +606,31 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </span>
               </div>
             </div>
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center p-2 ${
               pendingHelpCount > 0
                 ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30 animate-pulse'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                : 'bg-slate-100 dark:bg-[#18181b] text-slate-500 dark:text-zinc-400'
             }`}>
-              <Hand className="w-5 h-5" />
+              <img src={handRaiseIcon} alt="Help" className="w-6 h-6 object-contain" />
             </div>
           </div>
         </div>
 
         {/* Navigation Tabs Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-slate-800/80">
-          <div className="flex items-center gap-1.5 bg-slate-200/60 dark:bg-slate-900/80 p-1.5 rounded-2xl border border-slate-300/70 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-zinc-800/80">
+          <div className="flex items-center gap-1.5 bg-slate-200/60 dark:bg-[#121214]/80 p-1.5 rounded-2xl border border-slate-300/70 dark:border-zinc-800">
             <button
               type="button"
               onClick={() => setActiveTab('tests')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'tests'
-                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-slate-700/60'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-[#18181b] text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
               }`}
             >
               <BookOpen className="w-4 h-4" />
               <span>Assessments</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-950 text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+              <span className="px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-[#09090b] text-[10px] font-semibold text-slate-600 dark:text-zinc-400">
                 {tests.length}
               </span>
             </button>
@@ -613,8 +640,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               onClick={() => setActiveTab('monitor')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'monitor'
-                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-slate-700/60'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-[#18181b] text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
               }`}
             >
               <Activity className="w-4 h-4" />
@@ -629,13 +656,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               onClick={() => setActiveTab('bank')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'bank'
-                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-slate-700/60'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-[#18181b] text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
               }`}
             >
               <Code2 className="w-4 h-4" />
               <span>Question Bank</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-950 text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+              <span className="px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-[#09090b] text-[10px] font-semibold text-slate-600 dark:text-zinc-400">
                 {bankQuestions.length}
               </span>
             </button>
@@ -657,7 +684,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         {activeTab === 'tests' && (
           <div className="space-y-5">
             {/* Search & Status Filters */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#121214] p-3.5 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-xs">
               <div className="relative flex-1 max-w-md">
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -665,12 +692,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   value={testSearch}
                   onChange={(e) => setTestSearch(e.target.value)}
                   placeholder="Search assessments by title, join code, or description..."
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
                 />
                 {testSearch && (
                   <button
                     onClick={() => setTestSearch('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 text-xs"
                   >
                     ✕
                   </button>
@@ -687,7 +714,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
                       testStatusFilter === st
                         ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        : 'bg-slate-100 dark:bg-[#18181b] text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-700'
                     }`}
                   >
                     {st === 'all' ? 'All Assessments' : st}
@@ -697,13 +724,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             </div>
 
             {tests.length === 0 ? (
-              <div className="p-12 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-4">
+              <div className="p-12 text-center bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-3xl shadow-sm space-y-4">
                 <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-600 dark:text-indigo-400 shadow-sm">
                   <BookOpen className="w-7 h-7" />
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-base font-bold text-slate-900 dark:text-white">No Coding Assessments Created Yet</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
                     Design your first offline or online classroom coding assessment with automated testcase evaluation.
                   </p>
                 </div>
@@ -716,8 +743,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </button>
               </div>
             ) : filteredTests.length === 0 ? (
-              <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2">
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No assessments match your search criteria</p>
+              <div className="p-8 text-center bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl space-y-2">
+                <p className="text-sm font-semibold text-slate-700 dark:text-zinc-300">No assessments match your search criteria</p>
                 <button
                   type="button"
                   onClick={() => { setTestSearch(''); setTestStatusFilter('all'); }}
@@ -736,10 +763,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   return (
                     <div
                       key={test.id}
-                      className={`bg-white dark:bg-slate-900 border rounded-2xl p-5 transition-all flex flex-col justify-between space-y-4 relative ${
+                      className={`bg-white dark:bg-[#121214] border rounded-2xl p-5 transition-all flex flex-col justify-between space-y-4 relative ${
                         isLive
-                          ? 'border-emerald-400 dark:border-emerald-500/70 bg-gradient-to-b from-emerald-50/30 to-white dark:from-emerald-950/10 dark:to-slate-900'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                          ? 'border-emerald-400 dark:border-emerald-500/70 bg-gradient-to-b from-emerald-50/30 to-white dark:from-emerald-950/10 dark:to-[#121214]'
+                          : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700'
                       }`}
                     >
                       <div className="space-y-3.5">
@@ -748,7 +775,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             <h3 className="font-bold text-base text-slate-900 dark:text-white truncate leading-snug">
                               {test.title}
                             </h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                            <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2">
                               {test.description || 'No description provided.'}
                             </p>
                           </div>
@@ -759,7 +786,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                 : test.status === 'scheduled'
                                 ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30'
                                 : test.status === 'ended'
-                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                                ? 'bg-slate-100 dark:bg-[#18181b] text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700'
                                 : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30'
                             }`}
                           >
@@ -769,9 +796,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         </div>
 
                         {/* Join Code & Assessment Specs Box */}
-                        <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800/80 space-y-2.5">
+                        <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#09090b]/70 border border-slate-200/80 dark:border-zinc-800/80 space-y-2.5">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium">
+                            <span className="text-slate-500 dark:text-zinc-400 flex items-center gap-1.5 font-medium">
                               <Key className="w-3.5 h-3.5 text-indigo-500" />
                               Join Code:
                             </span>
@@ -785,7 +812,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                 className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
                                   isCopied
                                     ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 border-emerald-300'
-                                    : 'bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-800'
+                                    : 'bg-white dark:bg-[#121214] hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 border-slate-200 dark:border-zinc-800'
                                 }`}
                                 title="Copy Join Code"
                               >
@@ -794,18 +821,18 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-2 text-center text-xs py-1 border-t border-b border-slate-200/60 dark:border-slate-800/60">
+                          <div className="grid grid-cols-3 gap-2 text-center text-xs py-1 border-t border-b border-slate-200/60 dark:border-zinc-800/60">
                             <div>
                               <span className="block text-[10px] text-slate-400 uppercase font-semibold">Duration</span>
-                              <span className="font-bold text-slate-800 dark:text-slate-200">{test.duration_minutes}m</span>
+                              <span className="font-bold text-slate-800 dark:text-zinc-200">{test.duration_minutes}m</span>
                             </div>
                             <div>
                               <span className="block text-[10px] text-slate-400 uppercase font-semibold">Questions</span>
-                              <span className="font-bold text-slate-800 dark:text-slate-200">{test.questions?.length || 0}</span>
+                              <span className="font-bold text-slate-800 dark:text-zinc-200">{test.questions?.length || 0}</span>
                             </div>
                             <div>
                               <span className="block text-[10px] text-slate-400 uppercase font-semibold">Students</span>
-                              <span className="font-bold text-slate-800 dark:text-slate-200">{testAttempts.length}</span>
+                              <span className="font-bold text-slate-800 dark:text-zinc-200">{testAttempts.length}</span>
                             </div>
                           </div>
 
@@ -820,7 +847,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                               className={`flex-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
                                 test.enable_tab_switch_tracking !== false
                                   ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100'
-                                  : 'bg-slate-100 dark:bg-slate-900 text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-200'
+                                  : 'bg-slate-100 dark:bg-[#121214] text-slate-400 border-slate-200 dark:border-zinc-800 hover:bg-slate-200'
                               }`}
                               title="Toggle Tab-Switch Monitoring"
                             >
@@ -837,7 +864,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                               className={`flex-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
                                 test.enable_fullscreen_mode !== false
                                   ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100'
-                                  : 'bg-slate-100 dark:bg-slate-900 text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-200'
+                                  : 'bg-slate-100 dark:bg-[#121214] text-slate-400 border-slate-200 dark:border-zinc-800 hover:bg-slate-200'
                               }`}
                               title="Toggle Fullscreen Requirement"
                             >
@@ -849,7 +876,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       </div>
 
                       {/* Card Action Buttons */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200/80 dark:border-zinc-800">
                         <button
                           type="button"
                           onClick={() => handleToggleStatus(test)}
@@ -866,7 +893,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         <button
                           type="button"
                           onClick={() => onViewResults(test)}
-                          className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-700 dark:text-slate-300 transition-all cursor-pointer border border-slate-200/80 dark:border-slate-700/60"
+                          className="p-2.5 rounded-xl bg-slate-100 dark:bg-[#18181b] hover:bg-indigo-600 hover:text-white text-slate-700 dark:text-zinc-300 transition-all cursor-pointer border border-slate-200/80 dark:border-zinc-700/60"
                           title="View Assessment Results & Analytics"
                         >
                           <BarChart2 className="w-4 h-4" />
@@ -875,7 +902,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         <button
                           type="button"
                           onClick={() => onEditTest(test)}
-                          className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all cursor-pointer border border-slate-200/80 dark:border-slate-700/60"
+                          className="p-2.5 rounded-xl bg-slate-100 dark:bg-[#18181b] hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-all cursor-pointer border border-slate-200/80 dark:border-zinc-700/60"
                           title="Edit Assessment & Questions"
                         >
                           <Edit3 className="w-4 h-4" />
@@ -883,8 +910,22 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
                         <button
                           type="button"
+                          onClick={(e) => handleDuplicateTest(test, e)}
+                          disabled={isDuplicatingId === test.id}
+                          className="p-2.5 rounded-xl bg-slate-100 dark:bg-[#18181b] hover:bg-indigo-600 hover:text-white text-slate-700 dark:text-zinc-300 transition-all cursor-pointer border border-slate-200/80 dark:border-zinc-700/60 disabled:opacity-50"
+                          title="Duplicate / Clone Assessment"
+                        >
+                          {isDuplicatingId === test.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                          ) : (
+                            <CopyPlus className="w-4 h-4" />
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={() => setTestToDelete(test)}
-                          className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-400 transition-all cursor-pointer border border-slate-200/80 dark:border-slate-700/60"
+                          className="p-2.5 rounded-xl bg-slate-100 dark:bg-[#18181b] hover:bg-rose-100 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-400 transition-all cursor-pointer border border-slate-200/80 dark:border-zinc-700/60"
                           title="Delete Assessment"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -902,12 +943,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         {activeTab === 'monitor' && (
           <div className="space-y-5">
             {tests.length === 0 ? (
-              <div className="p-12 text-center text-slate-500 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl">
+              <div className="p-12 text-center text-slate-500 bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-3xl">
                 Please create an assessment first to monitor live students.
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="bg-white dark:bg-[#121214] p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
                       <Activity className="w-5 h-5" />
@@ -916,7 +957,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       <h2 className="text-sm font-bold text-slate-900 dark:text-white">
                         Monitoring: {selectedTest?.title || 'Active Assessment'}
                       </h2>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-zinc-400">
                         Join Code: <strong className="text-indigo-600 dark:text-indigo-400 font-mono font-bold">{selectedTest?.join_code}</strong>
                         <span className="mx-2">•</span>
                         Status: <span className="font-bold capitalize">{selectedTest?.status}</span>
@@ -929,7 +970,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     <select
                       value={selectedTestId}
                       onChange={(e) => setSelectedTestId(e.target.value)}
-                      className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                      className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
                     >
                       {tests.map((t) => (
                         <option key={t.id} value={t.id}>{t.title} ({t.status})</option>
@@ -957,7 +998,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white">Curated C Programming Question Bank</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Manage reusable problems with verified test cases and starter templates</p>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">Manage reusable problems with verified test cases and starter templates</p>
               </div>
 
               <button
@@ -971,7 +1012,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             </div>
 
             {/* Search & Difficulty Filter */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#121214] p-3.5 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-xs">
               <div className="relative flex-1 max-w-md">
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -979,7 +1020,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   value={bankSearch}
                   onChange={(e) => setBankSearch(e.target.value)}
                   placeholder="Search problem bank..."
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
@@ -992,7 +1033,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
                       bankDifficultyFilter === diff
                         ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        : 'bg-slate-100 dark:bg-[#18181b] text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-700'
                     }`}
                   >
                     {diff === 'all' ? 'All Difficulties' : diff}
@@ -1003,7 +1044,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredBankQuestions.map((q) => (
-                <div key={q.id} className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 space-y-3.5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div key={q.id} className="p-5 rounded-3xl bg-white dark:bg-[#121214] border border-slate-200/90 dark:border-zinc-800 space-y-3.5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
                   <div className="space-y-2.5">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-snug">{q.title}</h3>
@@ -1020,7 +1061,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         <button
                           type="button"
                           onClick={() => handleOpenEditBankQ(q)}
-                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-600 dark:text-slate-300 transition-colors"
+                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-[#18181b] hover:bg-indigo-600 hover:text-white text-slate-600 dark:text-zinc-300 transition-colors"
                           title="Edit Question"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
@@ -1028,7 +1069,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         <button
                           type="button"
                           onClick={() => setBankQToDelete(q.id)}
-                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-400 transition-colors"
+                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-[#18181b] hover:bg-rose-100 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-400 transition-colors"
                           title="Delete from Question Bank"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1036,14 +1077,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       </div>
                     </div>
 
-                    <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">{q.description}</p>
+                    <p className="text-xs text-slate-600 dark:text-zinc-400 line-clamp-2">{q.description}</p>
 
-                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 text-xs font-mono text-slate-800 dark:text-slate-300 max-h-24 overflow-y-auto border border-slate-200/80 dark:border-slate-800">
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#09090b] text-xs font-mono text-slate-800 dark:text-zinc-300 max-h-24 overflow-y-auto border border-slate-200/80 dark:border-zinc-800">
                       <pre>{q.starter_code}</pre>
                     </div>
                   </div>
 
-                  <div className="text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                  <div className="text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-zinc-800/80">
                     <span className="font-medium">{q.test_cases?.length || 0} Test Cases ({q.test_cases?.filter(t => t.is_sample).length} Sample, {q.test_cases?.filter(t => !t.is_sample).length} Hidden)</span>
                     <span className="text-indigo-600 dark:text-indigo-400 font-bold">C99 Standard</span>
                   </div>
@@ -1056,8 +1097,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         {/* Modal to Add / Edit Question Bank Question */}
         {showBankModal && editingBankQ && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+            <div className="bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-zinc-800">
                 <div className="flex items-center gap-2">
                   <Code2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                   <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -1067,7 +1108,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowBankModal(false)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold"
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 text-sm font-bold"
                 >
                   ✕
                 </button>
@@ -1076,36 +1117,36 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="sm:col-span-2 space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Question Title *</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Question Title *</label>
                     <input
                       type="text"
                       required
                       value={editingBankQ.title}
                       onChange={(e) => setEditingBankQ({ ...editingBankQ, title: e.target.value })}
                       placeholder="e.g. Check Palindrome Number"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Marks *</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Marks *</label>
                     <input
                       type="number"
                       min={1}
                       value={editingBankQ.marks}
                       onChange={(e) => setEditingBankQ({ ...editingBankQ, marks: Number(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Difficulty</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Difficulty</label>
                     <select
                       value={editingBankQ.difficulty}
                       onChange={(e) => setEditingBankQ({ ...editingBankQ, difficulty: e.target.value as any })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                     >
                       <option value="easy">Easy</option>
                       <option value="medium">Medium</option>
@@ -1114,25 +1155,25 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Constraints</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Constraints</label>
                     <input
                       type="text"
                       value={editingBankQ.constraints || ''}
                       onChange={(e) => setEditingBankQ({ ...editingBankQ, constraints: e.target.value })}
                       placeholder="e.g. 1 <= N <= 10^5"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 font-mono"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Problem Description *</label>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Problem Description *</label>
                   <textarea
                     rows={3}
                     value={editingBankQ.description}
                     onChange={(e) => setEditingBankQ({ ...editingBankQ, description: e.target.value })}
                     placeholder="Problem statement and task description..."
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none font-sans"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none font-sans"
                   />
                 </div>
 
@@ -1144,40 +1185,49 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Input Format</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Input Format</label>
                     <textarea
                       rows={2}
                       value={editingBankQ.input_format || ''}
                       onChange={(e) => setEditingBankQ({ ...editingBankQ, input_format: e.target.value })}
                       placeholder="Input format..."
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Output Format</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Output Format</label>
                     <textarea
                       rows={2}
                       value={editingBankQ.output_format || ''}
                       onChange={(e) => setEditingBankQ({ ...editingBankQ, output_format: e.target.value })}
                       placeholder="Output format..."
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Starter Code Template</label>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Starter Code Template</label>
                   <textarea
                     rows={4}
                     value={editingBankQ.starter_code || ''}
                     onChange={(e) => setEditingBankQ({ ...editingBankQ, starter_code: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
                   />
                 </div>
 
+                {/* Algorithm / Solution Approach Field with MS Word-style Smart Bullets and Numbering */}
+                <AlgorithmEditor
+                  value={editingBankQ.algorithm || ''}
+                  onChange={(val) => setEditingBankQ({ ...editingBankQ, algorithm: val })}
+                  rows={3}
+                  label="Algorithm / Solution Approach (Optional)"
+                  badgeText="Accessible in AI Code Assist"
+                />
+
                 {/* Test Cases */}
-                <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-zinc-800">
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
@@ -1203,7 +1253,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             test_cases: [...(editingBankQ.test_cases || []), newTC],
                           });
                         }}
-                        className="px-2.5 py-1 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-semibold flex items-center gap-1"
+                        className="px-2.5 py-1 rounded bg-slate-200 dark:bg-[#18181b] hover:bg-slate-300 dark:hover:bg-zinc-700 text-xs font-semibold flex items-center gap-1"
                       >
                         <Eye className="w-3.5 h-3.5 text-indigo-500" />
                         <span>+ Sample</span>
@@ -1225,7 +1275,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                             test_cases: [...(editingBankQ.test_cases || []), newTC],
                           });
                         }}
-                        className="px-2.5 py-1 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-semibold flex items-center gap-1"
+                        className="px-2.5 py-1 rounded bg-slate-200 dark:bg-[#18181b] hover:bg-slate-300 dark:hover:bg-zinc-700 text-xs font-semibold flex items-center gap-1"
                       >
                         <EyeOff className="w-3.5 h-3.5 text-amber-500" />
                         <span>+ Hidden</span>
@@ -1239,7 +1289,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         key={tc.id || idx}
                         className={`p-3 rounded-xl border text-xs space-y-2 ${
                           tc.is_sample
-                            ? 'bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800'
+                            ? 'bg-slate-50 dark:bg-[#09090b]/60 border-slate-200 dark:border-zinc-800'
                             : 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-500/30'
                         }`}
                       >
@@ -1261,7 +1311,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                   updatedTCs[idx] = { ...updatedTCs[idx], marks: Number(e.target.value) };
                                   setEditingBankQ({ ...editingBankQ, test_cases: updatedTCs });
                                 }}
-                                className="w-12 px-1 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-center"
+                                className="w-12 px-1 py-0.5 rounded bg-white dark:bg-[#121214] border border-slate-300 dark:border-zinc-800 text-center"
                               />
                             </label>
                             <button
@@ -1289,7 +1339,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                 setEditingBankQ({ ...editingBankQ, test_cases: updatedTCs });
                               }}
                               placeholder="e.g. 10 20"
-                              className="w-full p-1.5 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 font-mono text-xs"
+                              className="w-full p-1.5 rounded bg-white dark:bg-[#121214] border border-slate-300 dark:border-zinc-800 font-mono text-xs"
                             />
                           </div>
 
@@ -1304,7 +1354,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                 setEditingBankQ({ ...editingBankQ, test_cases: updatedTCs });
                               }}
                               placeholder="e.g. 30"
-                              className="w-full p-1.5 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 font-mono text-xs text-emerald-600 dark:text-emerald-400"
+                              className="w-full p-1.5 rounded bg-white dark:bg-[#121214] border border-slate-300 dark:border-zinc-800 font-mono text-xs text-emerald-600 dark:text-emerald-400"
                             />
                           </div>
                         </div>
@@ -1314,11 +1364,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setShowBankModal(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-semibold"
+                  className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-[#18181b] hover:bg-slate-300 dark:hover:bg-zinc-700 text-xs font-semibold"
                 >
                   Cancel
                 </button>
@@ -1380,118 +1430,112 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         />
       </div>
 
-      {/* Floating Chat-Style Help Queue Mini Action Button (Bottom Right) */}
+      {/* Floating Help Queue Action Button (Bottom Right - Direct Large Circular Icon) */}
       <div className="fixed bottom-6 right-6 z-40">
         <button
           type="button"
           onClick={() => setIsHelpDrawerOpen(true)}
-          className={`relative p-3.5 sm:p-4 rounded-full text-white shadow-2xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer ${
+          className={`relative p-0 rounded-full transition-all duration-200 hover:scale-110 active:scale-90 cursor-pointer focus:outline-none ${
             helpRequests.filter(r => r.status === 'pending').length > 0
-              ? 'bg-gradient-to-tr from-amber-500 to-rose-500 shadow-amber-500/40 ring-4 ring-amber-400/30 animate-bounce'
-              : 'bg-gradient-to-tr from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-indigo-600/30'
+              ? 'animate-bounce drop-shadow-[0_10px_20px_rgba(245,158,11,0.6)]'
+              : 'hover:drop-shadow-[0_8px_16px_rgba(0,0,0,0.3)] drop-shadow-[0_4px_10px_rgba(0,0,0,0.15)]'
           }`}
           title="Student Help Queue (Click to open)"
         >
-          <Hand className="w-6 h-6" />
+          <img src={handRaiseIcon} alt="Help Queue" className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-full" />
           {helpRequests.filter(r => r.status === 'pending').length > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[24px] h-[24px] px-1 rounded-full bg-rose-600 text-white text-xs font-black flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-lg">
+            <span className="absolute -top-1.5 -right-1.5 min-w-[24px] h-[24px] px-1 rounded-full bg-rose-600 text-white text-xs font-black flex items-center justify-center border-2 border-white dark:border-zinc-800 shadow-lg animate-pulse">
               {helpRequests.filter(r => r.status === 'pending').length}
             </span>
           )}
         </button>
       </div>
 
-      {/* Slide-Over Help Queue Drawer */}
+      {/* Fullscreen Centered Help Queue Dialog Box */}
       {isHelpDrawerOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden select-none">
-          {/* Backdrop */}
+        <div className="fixed inset-0 z-50 overflow-y-auto select-none flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md transition-opacity animate-in fade-in">
+          {/* Backdrop Click Dismiss */}
           <div
             onClick={() => setIsHelpDrawerOpen(false)}
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+            className="fixed inset-0 -z-10"
           />
 
-          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-            <div className="w-screen max-w-md bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-              {/* Drawer Header */}
-              <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-950/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center shadow-lg shadow-amber-500/25">
-                    <Hand className="w-5 h-5" />
+          {/* Modal Container - Extended Vertical Height */}
+          <div className="relative w-full max-w-2xl sm:max-w-3xl h-[90vh] sm:h-[94vh] max-h-[96vh] min-h-[580px] bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto animate-in zoom-in-95 duration-200">
+            
+            {/* Dialog Header */}
+            <div className="px-6 py-4 sm:py-5 border-b border-slate-200/80 dark:border-zinc-800 flex items-center justify-between bg-slate-50/80 dark:bg-[#09090b]/60 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <img src={handRaiseIcon} alt="Help" className="w-12 h-12 sm:w-14 sm:h-14 object-contain rounded-full shrink-0 drop-shadow-md" />
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                      Student Classroom Help Queue
+                    </h2>
+                    {pendingHelpCount > 0 ? (
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-500/40 text-amber-800 dark:text-amber-300 text-xs font-bold animate-pulse">
+                        {pendingHelpCount} Students Waiting
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#18181b] border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 text-xs font-bold">
+                        Queue Clear
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-base font-black text-slate-900 dark:text-white">
-                        Student Help Queue
-                      </h2>
-                      {helpRequests.filter(r => r.status === 'pending').length > 0 && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-500/40 text-amber-800 dark:text-amber-300 text-[11px] font-bold">
-                          {helpRequests.filter(r => r.status === 'pending').length} Waiting
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Live offline assistance requests
-                    </p>
-                  </div>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                    Live offline assistance requests from students at their desks
+                  </p>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => playTingNotification()}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#18181b] hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                  title="Test audio alert chime"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>Test Chime</span>
+                </button>
+
+                {helpRequests.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllHelp}
+                    className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                )}
 
                 <button
                   type="button"
                   onClick={() => setIsHelpDrawerOpen(false)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                   title="Close Queue"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
+            </div>
 
-              {/* Queue Controls Bar */}
-              <div className="px-5 py-2.5 bg-slate-100/70 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-500 dark:text-slate-400 font-semibold">
-                    Queue Order
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => playTingNotification()}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer"
-                    title="Test incoming alert chime"
-                  >
-                    <Volume2 className="w-3 h-3" />
-                    <span>Test Ting</span>
-                  </button>
+            {/* Dialog Body */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-3.5 flex flex-col">
+              {pendingHelpCount === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-4 space-y-2">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                    No Pending Requests
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
+                    When students click the <strong>"Need Help?"</strong> button at their desks, their names, roll numbers, and active questions will appear here instantly.
+                  </p>
                 </div>
-                {helpRequests.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleClearAllHelp}
-                    className="text-rose-600 dark:text-rose-400 hover:underline text-[11px] font-bold cursor-pointer"
-                  >
-                    Clear All
-                  </button>
-                )}
-              </div>
-
-              {/* Drawer Body List */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-3.5">
-                {helpRequests.filter(r => r.status === 'pending').length === 0 ? (
-                  <div className="text-center py-16 px-4 space-y-4">
-                    <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle2 className="w-8 h-8" />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                        All Clear! No Pending Requests
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-                        When offline students click the <strong>"Need Help?"</strong> button at their desks, their names and active questions will appear here instantly.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  helpRequests
+              ) : (
+                <div className="flex flex-col space-y-3.5">
+                  {helpRequests
                     .filter(r => r.status === 'pending')
-                    .map((req, idx) => {
+                    .map((req) => {
                       const diffMs = Date.now() - new Date(req.requested_at).getTime();
                       const diffMin = Math.floor(diffMs / 60000);
                       const timeText = diffMin < 1 ? 'Just now' : `${diffMin}m ago`;
@@ -1499,69 +1543,72 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       return (
                         <div
                           key={req.id}
-                          className="bg-white dark:bg-slate-950 border-2 border-amber-400 dark:border-amber-500/50 rounded-2xl p-4 shadow-lg space-y-3 relative overflow-hidden animate-in fade-in slide-in-from-right duration-200"
+                          className="bg-white dark:bg-[#09090b]/70 border-2 border-amber-400 dark:border-amber-500/60 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all space-y-3.5 flex flex-col justify-between relative overflow-hidden animate-in fade-in duration-150"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2.5">
-                              <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-black flex items-center justify-center shrink-0">
-                                {idx + 1}
-                              </span>
+                          <div className="space-y-2.5">
+                            {/* Card Top: Student Info */}
+                            <div className="flex items-start justify-between gap-2">
                               <div>
-                                <h4 className="text-sm font-black text-slate-900 dark:text-white leading-tight">
+                                <h4 className="text-base font-black text-slate-900 dark:text-white leading-tight">
                                   {req.student_name}
                                 </h4>
-                                <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                  <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-400 mt-1">
+                                  <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800">
                                     UID: {req.student_roll_no}
                                   </span>
                                   <span>•</span>
-                                  <span>{timeText}</span>
+                                  <span className="flex items-center gap-1 font-medium">
+                                    <Clock className="w-3 h-3 text-slate-400" />
+                                    {timeText}
+                                  </span>
                                 </div>
                               </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteHelp(req.id)}
+                                className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+                                title="Dismiss Request"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteHelp(req.id)}
-                              className="text-slate-400 hover:text-rose-500 p-1 transition-colors"
-                              title="Dismiss Request"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                            {/* Active Question Box */}
+                            {req.question_title && (
+                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#121214] border border-slate-200/90 dark:border-zinc-800 text-xs">
+                                <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider block mb-1">
+                                  Current Problem
+                                </span>
+                                <span className="font-bold text-slate-800 dark:text-zinc-200 line-clamp-1 block">
+                                  {req.question_title}
+                                </span>
+                              </div>
+                            )}
                           </div>
-
-                          {req.question_title && (
-                            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
-                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-0.5">
-                                Active Problem
-                              </span>
-                              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                                {req.question_title}
-                              </span>
-                            </div>
-                          )}
 
                           {/* Action Button: Cut from queue / Mark assisted */}
                           <div className="pt-1">
                             <button
                               type="button"
                               onClick={() => handleResolveHelp(req.id)}
-                              className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 transition-all active:scale-95 cursor-pointer"
+                              className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 transition-all active:scale-98 cursor-pointer"
                             >
                               <Check className="w-4 h-4" />
-                              <span>Cut from Queue (Assisted)</span>
+                              <span>Attended & Cut from Queue</span>
                             </button>
                           </div>
                         </div>
                       );
-                    })
-                )}
-              </div>
+                    })}
+                </div>
+              )}
+            </div>
 
-              {/* Drawer Footer */}
-              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-center text-xs text-slate-500 dark:text-slate-400">
-                <span>Real-time classroom assistance queue</span>
-              </div>
+            {/* Dialog Footer */}
+            <div className="px-6 py-3.5 border-t border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-[#09090b]/60 flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
+              <span>Classroom assistance queue synced in real-time</span>
+              <span className="font-semibold text-indigo-600 dark:text-indigo-400">First Come, First Served</span>
             </div>
           </div>
         </div>

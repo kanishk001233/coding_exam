@@ -163,10 +163,10 @@ int main() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 md:p-10 font-sans transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 p-6 md:p-10 font-sans transition-colors">
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-zinc-800">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-950/80 border border-indigo-300 dark:border-indigo-500/30 text-indigo-700 dark:text-indigo-300 text-xs font-semibold mb-3">
               <Sparkles className="w-3.5 h-3.5" />
@@ -175,7 +175,7 @@ int main() {
             <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               In-Browser C Execution Sandbox
             </h1>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+            <p className="text-sm text-slate-600 dark:text-zinc-400 mt-1">
               Zero backend compilation • Zero paid APIs • Safe isolated Web Worker execution with watchdog termination
             </p>
           </div>
@@ -187,7 +187,7 @@ int main() {
               <button
                 type="button"
                 onClick={onNavigateHome}
-                className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold transition-colors"
+                className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-[#18181b] hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-semibold transition-colors"
               >
                 Back to App
               </button>
@@ -231,13 +231,13 @@ int main() {
                       ? res.passed
                         ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/40 shadow-md'
                         : 'bg-rose-50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-500/40 shadow-md'
-                      : 'bg-white dark:bg-slate-900/90 border-slate-200 dark:border-slate-800'
+                      : 'bg-white dark:bg-[#121214]/90 border-slate-200 dark:border-zinc-800'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="font-bold text-sm text-slate-900 dark:text-white">{test.title}</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{test.description}</p>
+                      <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">{test.description}</p>
                     </div>
 
                     {res && (
@@ -250,19 +250,19 @@ int main() {
                     )}
                   </div>
 
-                  <div className="mt-3 p-2.5 rounded bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 font-mono text-[11px] text-slate-800 dark:text-slate-300 max-h-32 overflow-y-auto">
+                  <div className="mt-3 p-2.5 rounded bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800/80 font-mono text-[11px] text-slate-800 dark:text-zinc-300 max-h-32 overflow-y-auto">
                     <pre>{test.code}</pre>
                   </div>
 
                   {test.input && (
-                    <div className="mt-2 text-xs font-mono text-slate-600 dark:text-slate-400">
+                    <div className="mt-2 text-xs font-mono text-slate-600 dark:text-zinc-400">
                       Input: <code className="text-indigo-600 dark:text-indigo-300">{test.input}</code>
                     </div>
                   )}
 
                   {res && (
-                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 text-xs flex items-center justify-between font-mono">
-                      <div className="text-slate-700 dark:text-slate-300 truncate max-w-[280px]">
+                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-zinc-800 text-xs flex items-center justify-between font-mono">
+                      <div className="text-slate-700 dark:text-zinc-300 truncate max-w-[280px]">
                         Result: <span className={res.passed ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400'}>{res.output}</span>
                       </div>
                       <span className="text-slate-400">{res.time}ms</span>
@@ -275,11 +275,11 @@ int main() {
         </div>
 
         {/* Live Interactive Playground */}
-        <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+        <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-zinc-800">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white">Live Interactive C Sandbox</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Write custom C code and run it directly in your browser's Web Worker</p>
+              <p className="text-xs text-slate-500 dark:text-zinc-400">Write custom C code and run it directly in your browser's Web Worker</p>
             </div>
 
             <button
@@ -313,22 +313,22 @@ int main() {
             </div>
 
             <div className="h-96 flex flex-col gap-3">
-              <div className="h-28 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 shadow-md">
-                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 font-sans">
+              <div className="h-28 flex flex-col bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-lg p-3 shadow-md">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-1 font-sans">
                   Standard Input (stdin for scanf):
                 </span>
                 <textarea
                   value={customInput}
                   onChange={(e) => setCustomInput(e.target.value)}
-                  className="flex-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded p-2 text-xs font-mono text-slate-900 dark:text-slate-200 resize-none focus:outline-none focus:border-indigo-500"
+                  className="flex-1 w-full bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded p-2 text-xs font-mono text-slate-900 dark:text-zinc-200 resize-none focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
-              <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 shadow-md">
-                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 font-sans">
+              <div className="flex-1 flex flex-col bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-lg p-3 shadow-md">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-1 font-sans">
                   Program Output (stdout / stderr):
                 </span>
-                <pre className="flex-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded p-2 text-xs font-mono text-emerald-800 dark:text-emerald-300 overflow-y-auto whitespace-pre-wrap">
+                <pre className="flex-1 w-full bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded p-2 text-xs font-mono text-emerald-800 dark:text-emerald-300 overflow-y-auto whitespace-pre-wrap">
                   {customOutput || 'Ready. Click "Execute Custom C Code" to test.'}
                 </pre>
               </div>

@@ -267,18 +267,74 @@ class DatabaseService {
   public async syncFromSupabase(): Promise<void> {
     if (!isSupabaseConfigured || !supabase) return;
     try {
+      // 1. Fetch tests, questions, and test_cases directly
       const { data: testsData, error: testsError } = await supabase
         .from('tests')
-        .select(`
-          *,
-          questions:questions (
-            *,
-            test_cases:test_cases (*)
-          )
-        `);
+        .select('*');
 
       if (!testsError && testsData && testsData.length > 0) {
-        localStorage.setItem(this.testsKey, JSON.stringify(testsData));
+        // Fetch all questions
+        const { data: questionsData } = await supabase
+          .from('questions')
+          .select('*')
+          .order('question_order', { ascending: true });
+
+        // Fetch all test cases
+        const { data: testCasesData } = await supabase
+          .from('test_cases')
+          .select('*');
+
+        const tcMap = new Map<string, TestCase[]>();
+        if (testCasesData) {
+          for (const tc of testCasesData) {
+            if (!tcMap.has(tc.question_id)) {
+              tcMap.set(tc.question_id, []);
+            }
+            tcMap.get(tc.question_id)!.push(tc);
+          }
+        }
+
+        const qMap = new Map<string, Question[]>();
+        if (questionsData) {
+          for (const q of questionsData) {
+            const qCases = tcMap.get(q.id) || q.test_cases || [];
+            const fullQ: Question = {
+              ...q,
+              test_cases: qCases,
+            };
+            if (!qMap.has(q.test_id)) {
+              qMap.set(q.test_id, []);
+            }
+            qMap.get(q.test_id)!.push(fullQ);
+          }
+        }
+
+        // Merge with local tests
+        const existingLocalTests = this.getTests();
+        const localTestMap = new Map<string, Test>(existingLocalTests.map(t => [t.id, t]));
+
+        const combinedTests: Test[] = testsData.map((t: any) => {
+          const supabaseQuestions = qMap.get(t.id);
+          const localTest = localTestMap.get(t.id);
+          const finalQuestions = (supabaseQuestions && supabaseQuestions.length > 0)
+            ? supabaseQuestions
+            : (localTest?.questions || []);
+
+          return {
+            ...localTest,
+            ...t,
+            questions: finalQuestions,
+            total_marks: finalQuestions.reduce((sum, q) => sum + (q.marks || 0), 0) || t.total_marks || 0,
+          };
+        });
+
+        for (const localTest of existingLocalTests) {
+          if (!combinedTests.some(ct => ct.id === localTest.id)) {
+            combinedTests.push(localTest);
+          }
+        }
+
+        localStorage.setItem(this.testsKey, JSON.stringify(combinedTests));
       }
 
       const { data: attemptsData, error: attemptsError } = await supabase
@@ -420,44 +476,81 @@ class DatabaseService {
           console.error('Supabase tests upsert failed:', testErr.message, testErr);
         }
 
-        if (test.questions) {
-          for (const q of test.questions) {
-            const { error: qErr } = await supabase.from('questions').upsert({
-              id: q.id,
-              test_id: test.id,
-              title: q.title,
-              description: q.description,
-              input_format: q.input_format,
-              output_format: q.output_format,
-              constraints: q.constraints,
-              starter_code: q.starter_code,
-              difficulty: q.difficulty,
-              marks: q.marks,
-              time_limit_ms: q.time_limit_ms,
-              memory_limit_mb: q.memory_limit_mb,
-              question_order: q.question_order,
-              image_url: q.image_url || null,
+        const currentQuestions = test.questions || [];
+        const currentQIds = currentQuestions.map(q => q.id);
+
+        // Fetch existing questions in Supabase for this test and delete any removed questions
+        const { data: existingQs } = await supabase
+          .from('questions')
+          .select('id')
+          .eq('test_id', test.id);
+
+        if (existingQs && existingQs.length > 0) {
+          const toDeleteQIds = existingQs
+            .map(q => q.id)
+            .filter(id => !currentQIds.includes(id));
+
+          if (toDeleteQIds.length > 0) {
+            await supabase.from('test_cases').delete().in('question_id', toDeleteQIds);
+            await supabase.from('questions').delete().in('id', toDeleteQIds);
+          }
+        }
+
+        // Upsert questions and test cases
+        for (const q of currentQuestions) {
+          const { error: qErr } = await supabase.from('questions').upsert({
+            id: q.id,
+            test_id: test.id,
+            title: q.title,
+            description: q.description,
+            input_format: q.input_format,
+            output_format: q.output_format,
+            constraints: q.constraints,
+            starter_code: q.starter_code,
+            difficulty: q.difficulty,
+            marks: q.marks,
+            time_limit_ms: q.time_limit_ms,
+            memory_limit_mb: q.memory_limit_mb,
+            question_order: q.question_order,
+            image_url: q.image_url || null,
+            algorithm: q.algorithm || null,
+          });
+
+          if (qErr) {
+            console.error('Supabase questions upsert failed:', qErr.message, qErr);
+          }
+
+          const currentTestCases = q.test_cases || [];
+          const currentTcIds = currentTestCases.map(tc => tc.id);
+
+          // Delete any removed test_cases for this question
+          const { data: existingTCs } = await supabase
+            .from('test_cases')
+            .select('id')
+            .eq('question_id', q.id);
+
+          if (existingTCs && existingTCs.length > 0) {
+            const toDeleteTcIds = existingTCs
+              .map(tc => tc.id)
+              .filter(id => !currentTcIds.includes(id));
+
+            if (toDeleteTcIds.length > 0) {
+              await supabase.from('test_cases').delete().in('id', toDeleteTcIds);
+            }
+          }
+
+          for (const tc of currentTestCases) {
+            const { error: tcErr } = await supabase.from('test_cases').upsert({
+              id: tc.id,
+              question_id: q.id,
+              input: tc.input,
+              expected_output: tc.expected_output,
+              is_sample: tc.is_sample,
+              marks: tc.marks,
             });
 
-            if (qErr) {
-              console.error('Supabase questions upsert failed:', qErr.message, qErr);
-            }
-
-            if (q.test_cases) {
-              for (const tc of q.test_cases) {
-                const { error: tcErr } = await supabase.from('test_cases').upsert({
-                  id: tc.id,
-                  question_id: q.id,
-                  input: tc.input,
-                  expected_output: tc.expected_output,
-                  is_sample: tc.is_sample,
-                  marks: tc.marks,
-                });
-
-                if (tcErr) {
-                  console.error('Supabase test_cases upsert failed:', tcErr.message, tcErr);
-                }
-              }
+            if (tcErr) {
+              console.error('Supabase test_cases upsert failed:', tcErr.message, tcErr);
             }
           }
         }
@@ -469,12 +562,155 @@ class DatabaseService {
     return test;
   }
 
+  public generateUniqueJoinCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const existing = this.getTests();
+    if (existing.some(t => t.join_code?.toUpperCase() === code.toUpperCase())) {
+      return this.generateUniqueJoinCode();
+    }
+    return code;
+  }
+
+  public async duplicateTest(sourceTestId: string, directSourceTest?: Test): Promise<Test | null> {
+    let sourceTest = directSourceTest || this.getTestById(sourceTestId);
+
+    // If Supabase is configured, always verify against Supabase questions table to ensure no questions are missed
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: qData } = await supabase
+          .from('questions')
+          .select('*')
+          .eq('test_id', sourceTestId)
+          .order('question_order', { ascending: true });
+
+        if (qData && qData.length > 0) {
+          const qIds = qData.map(q => q.id);
+          const { data: tcData } = await supabase
+            .from('test_cases')
+            .select('*')
+            .in('question_id', qIds);
+
+          const tcMap = new Map<string, TestCase[]>();
+          if (tcData) {
+            for (const tc of tcData) {
+              if (!tcMap.has(tc.question_id)) {
+                tcMap.set(tc.question_id, []);
+              }
+              tcMap.get(tc.question_id)!.push(tc);
+            }
+          }
+
+          const supabaseQuestions: Question[] = qData.map(q => ({
+            ...q,
+            test_cases: tcMap.get(q.id) || [],
+          }));
+
+          const localCount = sourceTest?.questions?.length || 0;
+          if (!sourceTest || localCount < supabaseQuestions.length) {
+            if (sourceTest) {
+              sourceTest = { ...sourceTest, questions: supabaseQuestions };
+            } else {
+              const { data: tData } = await supabase.from('tests').select('*').eq('id', sourceTestId).single();
+              sourceTest = {
+                ...(tData || {}),
+                id: sourceTestId,
+                title: tData?.title || 'Assessment',
+                join_code: tData?.join_code || this.generateUniqueJoinCode(),
+                duration_minutes: tData?.duration_minutes || 45,
+                status: 'draft',
+                created_by: tData?.created_by || 'teacher-kanishk',
+                created_at: new Date().toISOString(),
+                questions: supabaseQuestions,
+              };
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase fetch during duplicateTest:', err);
+      }
+    }
+
+    if (!sourceTest) return null;
+
+    const sourceQuestions = sourceTest.questions || [];
+    const newTestId = 'test-' + Math.random().toString(36).substring(2, 9);
+    const newJoinCode = this.generateUniqueJoinCode();
+
+    // Deep clone all questions and their test cases, explicitly preserving image_url and algorithm
+    const clonedQuestions: Question[] = sourceQuestions.map((q, qIndex) => {
+      const newQuestionId = 'q-' + Math.random().toString(36).substring(2, 9);
+      const clonedTestCases = (q.test_cases || []).map((tc, tcIndex) => ({
+        id: 'tc-' + Math.random().toString(36).substring(2, 9) + '-' + tcIndex,
+        question_id: newQuestionId,
+        input: tc.input ?? '',
+        expected_output: tc.expected_output ?? '',
+        is_sample: Boolean(tc.is_sample),
+        marks: tc.marks ?? 5,
+      }));
+
+      return {
+        id: newQuestionId,
+        test_id: newTestId,
+        title: q.title || `Problem ${qIndex + 1}`,
+        description: q.description || '',
+        input_format: q.input_format || '',
+        output_format: q.output_format || '',
+        constraints: q.constraints || '',
+        starter_code: q.starter_code || '#include <stdio.h>\n\nint main() {\n    // Write your solution here\n    return 0;\n}',
+        difficulty: q.difficulty || 'easy',
+        marks: q.marks ?? 10,
+        time_limit_ms: q.time_limit_ms ?? 2000,
+        memory_limit_mb: q.memory_limit_mb ?? 64,
+        question_order: q.question_order ?? (qIndex + 1),
+        image_url: q.image_url ? String(q.image_url).trim() : undefined,
+        algorithm: q.algorithm ? String(q.algorithm).trim() : undefined,
+        test_cases: clonedTestCases,
+      };
+    });
+
+    const totalMarks = clonedQuestions.reduce((sum, q) => sum + (q.marks || 0), 0);
+
+    const newTest: Test = {
+      ...sourceTest,
+      id: newTestId,
+      title: `${sourceTest.title || 'Assessment'} (Copy)`,
+      description: sourceTest.description || '',
+      join_code: newJoinCode,
+      duration_minutes: sourceTest.duration_minutes || 45,
+      status: 'draft',
+      created_by: sourceTest.created_by || 'teacher-kanishk',
+      created_at: new Date().toISOString(),
+      questions: clonedQuestions,
+      total_marks: totalMarks,
+      enable_tab_switch_tracking: sourceTest.enable_tab_switch_tracking !== false,
+      enable_fullscreen_mode: sourceTest.enable_fullscreen_mode !== false,
+    };
+
+    await this.saveTest(newTest);
+    return newTest;
+  }
+
   public async deleteTest(id: string): Promise<void> {
     const tests = this.getTests().filter(t => t.id !== id);
     localStorage.setItem(this.testsKey, JSON.stringify(tests));
 
     if (isSupabaseConfigured && supabase) {
       try {
+        const { data: qData } = await supabase
+          .from('questions')
+          .select('id')
+          .eq('test_id', id);
+
+        if (qData && qData.length > 0) {
+          const qIds = qData.map(q => q.id);
+          await supabase.from('test_cases').delete().in('question_id', qIds);
+          await supabase.from('questions').delete().in('id', qIds);
+        }
+
         await supabase.from('tests').delete().eq('id', id);
       } catch (e) {
         console.warn('Supabase delete error:', e);
@@ -764,7 +1000,27 @@ class DatabaseService {
   }
 
   public clearStorageAfterTest(attemptId: string): void {
-    this.clearAttemptDrafts(attemptId);
+    try {
+      this.clearAttemptDrafts(attemptId);
+      localStorage.removeItem(`c_exam_ai_state_${attemptId}`);
+      localStorage.removeItem(`c_exam_last_q_${attemptId}`);
+      
+      // Clean up all localStorage keys associated with this attempt
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes(attemptId) || key.startsWith(`c_exam_ai_state_${attemptId}`))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => {
+        try {
+          localStorage.removeItem(k);
+        } catch {}
+      });
+    } catch (e) {
+      console.error('Error clearing test localStorage:', e);
+    }
   }
 
   // Help Requests (Need Help Queue)
@@ -925,3 +1181,5 @@ class DatabaseService {
 }
 
 export const mockDb = new DatabaseService();
+export const db = mockDb;
+export { DatabaseService };

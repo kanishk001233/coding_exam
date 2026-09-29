@@ -71,6 +71,7 @@ export const CSV_HEADERS = [
   'input_format',
   'output_format',
   'template_code',
+  'algorithm',
   // Sample test cases (1 to 4)
   'sample_1_input',
   'sample_1_expected_output',
@@ -327,6 +328,13 @@ export function parseCSVToQuestions(csvText: string): Question[] {
       getCol(row, 'media_url') ||
       '';
 
+    const algorithm =
+      getCol(row, 'algorithm') ||
+      getCol(row, 'algo') ||
+      getCol(row, 'solution_approach') ||
+      getCol(row, 'logic') ||
+      '';
+
     const question: Question = {
       id: `q-csv-${r}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       test_id: '',
@@ -341,6 +349,7 @@ export function parseCSVToQuestions(csvText: string): Question[] {
       time_limit_ms: 2000,
       memory_limit_mb: 64,
       image_url: imageUrl.trim() || undefined,
+      algorithm: algorithm.trim() || undefined,
       question_order: r,
       test_cases: testCases,
     };

@@ -17,15 +17,15 @@ export const Submission: React.FC<SubmissionProps> = ({ attempt, onBack }) => {
   const activeSub = submissions[selectedSubIndex] || submissions[0];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 sm:p-8 font-sans transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 p-6 sm:p-8 font-sans transition-colors">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-zinc-800">
           <div>
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white mb-2 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white mb-2 transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Monitor</span>
@@ -33,7 +33,7 @@ export const Submission: React.FC<SubmissionProps> = ({ attempt, onBack }) => {
             <h1 className="text-2xl font-black text-slate-900 dark:text-white">
               Student Code Submission: {attempt.student_name}
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
               Roll No: <strong className="text-indigo-600 dark:text-indigo-300 font-mono">{attempt.student_roll_no}</strong> • Score: <strong className="text-emerald-600 dark:text-emerald-400">{attempt.score} pts</strong> • Status: {attempt.status}
             </p>
           </div>
@@ -50,14 +50,14 @@ export const Submission: React.FC<SubmissionProps> = ({ attempt, onBack }) => {
         </div>
 
         {submissions.length === 0 ? (
-          <div className="p-12 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-500 text-xs">
+          <div className="p-12 text-center bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl text-slate-500 text-xs">
             Student has not submitted code for any questions yet.
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Question Selector Tabs */}
             <div className="lg:col-span-4 space-y-3">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Submissions</span>
+              <span className="text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Submissions</span>
 
               <div className="space-y-2">
                 {submissions.map((sub, idx) => (
@@ -67,7 +67,7 @@ export const Submission: React.FC<SubmissionProps> = ({ attempt, onBack }) => {
                     className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
                       idx === selectedSubIndex
                         ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-500 text-slate-900 dark:text-white shadow-md'
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                        : 'bg-white dark:bg-[#121214] border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-slate-300 dark:hover:border-zinc-700'
                     }`}
                   >
                     <div className="flex items-center justify-between text-xs">
@@ -79,7 +79,7 @@ export const Submission: React.FC<SubmissionProps> = ({ attempt, onBack }) => {
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2 font-mono">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 mt-2 font-mono">
                       <span>Score: {sub.score}/{sub.max_score}</span>
                       <span>{sub.execution_time}ms</span>
                     </div>
@@ -102,8 +102,8 @@ export const Submission: React.FC<SubmissionProps> = ({ attempt, onBack }) => {
                   </div>
 
                   {activeSub.results && activeSub.results.length > 0 && (
-                    <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
-                      <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    <div className="p-4 bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-xl space-y-3">
+                      <h4 className="text-xs font-bold text-slate-700 dark:text-zinc-300 uppercase tracking-wider">
                         Grading Results Breakdown
                       </h4>
 

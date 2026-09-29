@@ -131,21 +131,21 @@ export const Results: React.FC<ResultsProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-4 sm:p-8 font-sans transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 p-4 sm:p-8 font-sans transition-colors">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Navigation / Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-zinc-800">
           <div>
             <button
               type="button"
               onClick={onBackToDashboard}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white mb-2 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white mb-2 transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Dashboard</span>
             </button>
             <h1 className="text-2xl font-black text-slate-900 dark:text-white">{test.title}</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
               Assessment Results & Performance Analytics • Code: <strong className="text-indigo-600 dark:text-indigo-300 font-mono">{test.join_code}</strong>
             </p>
           </div>
@@ -181,22 +181,22 @@ export const Results: React.FC<ResultsProps> = ({
         {attempt && !isTeacherView && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 shadow-md">
-                <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Total Score</span>
+              <div className="p-5 rounded-2xl bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 space-y-1 shadow-md">
+                <span className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wider font-semibold">Total Score</span>
                 <div className="text-3xl font-black text-slate-900 dark:text-white font-mono">
-                  {attempt.score} <span className="text-slate-400 dark:text-slate-500 text-lg">/ {maxPossibleMarks}</span>
+                  {attempt.score} <span className="text-slate-400 dark:text-zinc-500 text-lg">/ {maxPossibleMarks}</span>
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 shadow-md">
-                <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Percentage</span>
+              <div className="p-5 rounded-2xl bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 space-y-1 shadow-md">
+                <span className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wider font-semibold">Percentage</span>
                 <div className="text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
                   {maxPossibleMarks > 0 ? Math.round((attempt.score / maxPossibleMarks) * 100) : 0}%
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 shadow-md">
-                <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Status</span>
+              <div className="p-5 rounded-2xl bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 space-y-1 shadow-md">
+                <span className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wider font-semibold">Status</span>
                 <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 capitalize flex items-center gap-1.5 pt-1">
                   <CheckCircle className="w-5 h-5" />
                   <span>Submitted Successfully</span>
@@ -205,12 +205,12 @@ export const Results: React.FC<ResultsProps> = ({
             </div>
 
             {/* Questions Breakdown */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
+            <div className="bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4 shadow-xl">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                 Question-Wise Performance
               </h3>
 
-              <div className="divide-y divide-slate-200 dark:divide-slate-800/80">
+              <div className="divide-y divide-slate-200 dark:divide-zinc-800/80">
                 {questions.map((q, idx) => {
                   const sub = studentSubmissions.find((s) => s.question_id === q.id);
                   const isAccepted = sub?.status === 'accepted';
@@ -219,12 +219,12 @@ export const Results: React.FC<ResultsProps> = ({
                   return (
                     <div key={q.id} className="py-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="flex items-center justify-center w-7 h-7 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs">
+                        <span className="flex items-center justify-center w-7 h-7 rounded-md bg-slate-100 dark:bg-[#18181b] text-slate-700 dark:text-zinc-300 font-mono text-xs">
                           Q{idx + 1}
                         </span>
                         <div>
                           <h4 className="text-sm font-semibold text-slate-900 dark:text-white">{q.title}</h4>
-                          <span className="text-xs text-slate-500 dark:text-slate-400 capitalize">{q.difficulty} • {q.marks} Max Points</span>
+                          <span className="text-xs text-slate-500 dark:text-zinc-400 capitalize">{q.difficulty} • {q.marks} Max Points</span>
                         </div>
                       </div>
 
@@ -254,44 +254,44 @@ export const Results: React.FC<ResultsProps> = ({
         {isTeacherView && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 shadow-md">
-                <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Class Average Score</span>
+              <div className="p-5 rounded-2xl bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 space-y-1 shadow-md">
+                <span className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wider font-semibold">Class Average Score</span>
                 <div className="text-3xl font-black text-slate-900 dark:text-white font-mono">
-                  {avgScore} <span className="text-slate-400 dark:text-slate-500 text-lg">/ {maxPossibleMarks}</span>
+                  {avgScore} <span className="text-slate-400 dark:text-zinc-500 text-lg">/ {maxPossibleMarks}</span>
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 shadow-md">
-                <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Average Pass Percentage</span>
+              <div className="p-5 rounded-2xl bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 space-y-1 shadow-md">
+                <span className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wider font-semibold">Average Pass Percentage</span>
                 <div className="text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono">{avgPercentage}%</div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 shadow-md">
-                <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Total Submissions</span>
+              <div className="p-5 rounded-2xl bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 space-y-1 shadow-md">
+                <span className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wider font-semibold">Total Submissions</span>
                 <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                  {submittedAttempts.length} <span className="text-slate-400 dark:text-slate-500 text-lg">/ {allAttempts.length}</span>
+                  {submittedAttempts.length} <span className="text-slate-400 dark:text-zinc-500 text-lg">/ {allAttempts.length}</span>
                 </div>
               </div>
             </div>
 
             {/* Question Analytics */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
+            <div className="bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4 shadow-xl">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Question Success Rate Analytics</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Identifies curriculum topics requiring additional reinforcement</p>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">Identifies curriculum topics requiring additional reinforcement</p>
                 </div>
                 <BarChart3 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                 {questionStats.map((qs) => (
-                  <div key={qs.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 space-y-2">
+                  <div key={qs.id} className="p-4 rounded-xl bg-slate-50 dark:bg-[#09090b]/70 border border-slate-200 dark:border-zinc-800/80 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-slate-900 dark:text-white">{qs.title}</span>
                       <span className="text-xs font-bold font-mono text-indigo-600 dark:text-indigo-300">{qs.successRate}% Success</span>
                     </div>
-                    <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                    <div className="w-full bg-slate-200 dark:bg-[#18181b] h-2 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all ${
                           qs.successRate >= 75 ? 'bg-emerald-500' : qs.successRate >= 50 ? 'bg-amber-500' : 'bg-rose-500'
@@ -309,11 +309,11 @@ export const Results: React.FC<ResultsProps> = ({
             </div>
 
             {/* Student Leaderboard */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
+            <div className="bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4 shadow-xl">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Student Scores & Submissions</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Individual scores and anti-cheat event counts</p>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">Individual scores and anti-cheat event counts</p>
                 </div>
                 <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
               </div>
@@ -324,8 +324,8 @@ export const Results: React.FC<ResultsProps> = ({
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                    <thead className="bg-slate-100 dark:bg-slate-950/50 text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-800">
+                  <table className="w-full text-left text-xs text-slate-700 dark:text-zinc-300">
+                    <thead className="bg-slate-100 dark:bg-[#09090b]/50 text-slate-600 dark:text-zinc-400 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-zinc-800">
                       <tr>
                         <th className="px-4 py-3">UID</th>
                         <th className="px-4 py-3">Student Name</th>
@@ -336,11 +336,11 @@ export const Results: React.FC<ResultsProps> = ({
                         {isTeacherView && <th className="px-4 py-3 text-right">Actions</th>}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 font-mono">
+                    <tbody className="divide-y divide-slate-200 dark:divide-zinc-800/60 font-mono">
                       {submittedAttempts.map((att) => {
                         const pct = maxPossibleMarks > 0 ? Math.round((att.score / maxPossibleMarks) * 100) : 0;
                         return (
-                          <tr key={att.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <tr key={att.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40">
                             <td className="px-4 py-3 font-bold text-indigo-600 dark:text-indigo-300">{att.student_roll_no}</td>
                             <td className="px-4 py-3 font-sans font-medium text-slate-900 dark:text-white">{att.student_name}</td>
                             <td className="px-4 py-3 font-sans">
@@ -350,13 +350,13 @@ export const Results: React.FC<ResultsProps> = ({
                             </td>
                             <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">{att.score} / {maxPossibleMarks}</td>
                             <td className="px-4 py-3 font-bold text-indigo-600 dark:text-indigo-400">{pct}%</td>
-                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{att.tab_switch_count || 0} flags</td>
+                            <td className="px-4 py-3 text-slate-500 dark:text-zinc-400">{att.tab_switch_count || 0} flags</td>
                             {isTeacherView && (
                               <td className="px-4 py-3 text-right">
                                 <button
                                   type="button"
                                   onClick={() => setAttemptToDelete(att)}
-                                  className="p-1 rounded bg-slate-200 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-rose-950 hover:text-rose-600 dark:hover:text-rose-400 text-slate-400 transition-colors inline-flex items-center"
+                                  className="p-1 rounded bg-slate-200 dark:bg-[#18181b] hover:bg-rose-100 dark:hover:bg-rose-950 hover:text-rose-600 dark:hover:text-rose-400 text-slate-400 transition-colors inline-flex items-center"
                                   title="Delete Result"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />

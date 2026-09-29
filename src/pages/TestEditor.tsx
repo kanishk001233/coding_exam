@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Test, Question, TestCase } from '../types/database';
 import { mockDb } from '../lib/mockDb';
-import { ArrowLeft, Plus, Trash2, Save, Eye, EyeOff, Code2, ShieldCheck, Loader2 } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { ArrowLeft, Plus, Trash2, Save, Eye, EyeOff, Code2, ShieldCheck, Loader2, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
 import { QuestionMediaUpload } from '../components/QuestionMediaUpload';
+import { AlgorithmEditor } from '../components/AlgorithmEditor';
 
 interface TestEditorProps {
   test: Test;
@@ -22,6 +24,26 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
     test.enable_fullscreen_mode !== false
   );
   const [questions, setQuestions] = useState<Question[]>(test.questions || []);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if ((!test.questions || test.questions.length === 0) && isSupabaseConfigured && supabase && test.id) {
+      supabase
+        .from('questions')
+        .select(`
+          *,
+          test_cases:test_cases (*)
+        `)
+        .eq('test_id', test.id)
+        .order('question_order', { ascending: true })
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            setQuestions(data);
+          }
+        });
+    }
+  }, [test.id]);
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState<number>(0);
   const [validationAlert, setValidationAlert] = useState<{ title: string; message: string } | null>(null);
 
@@ -36,6 +58,66 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
       };
       return next;
     });
+  };
+
+  const moveQuestion = (fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= questions.length ||
+      toIndex >= questions.length
+    ) {
+      return;
+    }
+
+    setQuestions((prev) => {
+      const next = [...prev];
+      const [movedItem] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, movedItem);
+      return next.map((q, i) => ({ ...q, question_order: i + 1 }));
+    });
+
+    setSelectedQuestionIndex((prev) => {
+      if (prev === fromIndex) return toIndex;
+      if (fromIndex < prev && toIndex >= prev) return prev - 1;
+      if (fromIndex > prev && toIndex <= prev) return prev + 1;
+      return prev;
+    });
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.setData('text/plain', index.toString());
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = (_e: React.DragEvent, index: number) => {
+    if (dragOverIndex === index) {
+      setDragOverIndex(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== targetIndex) {
+      moveQuestion(draggedIndex, targetIndex);
+    }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   const handleAddQuestion = () => {
@@ -125,9 +207,13 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
     setIsSaving(true);
     try {
       const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+      const orderedQuestions = questions.map((q, idx) => ({
+        ...q,
+        question_order: idx + 1,
+      }));
       const updated: Test = {
         ...currentTest,
-        questions,
+        questions: orderedQuestions,
         total_marks: totalMarks,
         enable_tab_switch_tracking: enableTabSwitchTracking,
         enable_fullscreen_mode: enableFullscreenMode,
@@ -143,15 +229,15 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 font-sans transition-colors relative">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 p-6 font-sans transition-colors relative">
       {/* Loading Overlay */}
       {isSaving && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-3 text-center animate-in zoom-in-95 duration-150">
+          <div className="bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-3 text-center animate-in zoom-in-95 duration-150">
             <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
             <div>
               <h3 className="font-bold text-sm text-slate-900 dark:text-white">Saving Test Changes</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Updating questions, constraints, and test cases...</p>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Updating questions, constraints, and test cases...</p>
             </div>
           </div>
         </div>
@@ -159,18 +245,18 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
 
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-zinc-800">
           <div>
             <button
               type="button"
               onClick={onCancel}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white mb-2 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white mb-2 transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Dashboard</span>
             </button>
             <h1 className="text-2xl font-black text-slate-900 dark:text-white">Edit Test: {currentTest.title}</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Modify test questions, starter code templates, sample and hidden test cases</p>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">Modify test questions, starter code templates, sample and hidden test cases</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -197,36 +283,36 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
         </div>
 
         {/* Test Settings & Anti-Cheat Controls Card */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+        <div className="bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 space-y-4 shadow-xl">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Test Title</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Test Title</label>
               <input
                 type="text"
                 value={currentTest.title}
                 onChange={(e) => setCurrentTest({ ...currentTest, title: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Duration (Minutes)</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Duration (Minutes)</label>
               <input
                 type="number"
                 min={5}
                 max={300}
                 value={currentTest.duration_minutes}
                 onChange={(e) => setCurrentTest({ ...currentTest, duration_minutes: Number(e.target.value) || 45 })}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Status</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Status</label>
               <select
                 value={currentTest.status}
                 onChange={(e) => setCurrentTest({ ...currentTest, status: e.target.value as any })}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
               >
                 <option value="live">Live</option>
                 <option value="scheduled">Scheduled</option>
@@ -236,7 +322,7 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
             </div>
           </div>
 
-          <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="pt-3 border-t border-slate-200 dark:border-zinc-800">
             <div className="flex items-center gap-2 mb-3">
               <ShieldCheck className="w-4 h-4 text-indigo-500" />
               <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
@@ -246,19 +332,19 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Tab Switch Toggle */}
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 flex items-start justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">Tab Switch & Blur Tracking</span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                       enableTabSwitchTracking
                         ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
-                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                        : 'bg-slate-200 dark:bg-[#18181b] text-slate-600 dark:text-zinc-400'
                     }`}>
                       {enableTabSwitchTracking ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
                     Track and record tab switches or window blur events during the exam.
                   </p>
                 </div>
@@ -270,24 +356,24 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
                     onChange={(e) => setEnableTabSwitchTracking(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                 </label>
               </div>
 
               {/* Fullscreen Toggle */}
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 flex items-start justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">Enforce Fullscreen Mode</span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                       enableFullscreenMode
                         ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
-                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                        : 'bg-slate-200 dark:bg-[#18181b] text-slate-600 dark:text-zinc-400'
                     }`}>
                       {enableFullscreenMode ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
                     Require fullscreen and trigger violation warnings on fullscreen exit.
                   </p>
                 </div>
@@ -299,7 +385,7 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
                     onChange={(e) => setEnableFullscreenMode(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                 </label>
               </div>
             </div>
@@ -311,82 +397,153 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
           {/* Question Navigator Column (3 cols) */}
           <div className="lg:col-span-3 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Questions</span>
+              <div>
+                <span className="text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Questions</span>
+                <p className="text-[10px] text-slate-400 dark:text-zinc-500">Drag to reorder sequence</p>
+              </div>
               <button
                 type="button"
                 onClick={handleAddQuestion}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/30 text-xs font-semibold hover:bg-indigo-200 dark:hover:bg-indigo-900"
+                className="flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/30 text-xs font-semibold hover:bg-indigo-200 dark:hover:bg-indigo-900 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add</span>
               </button>
             </div>
 
-            <div className="space-y-2">
-              {questions.map((q, idx) => (
-                <div
-                  key={q.id || idx}
-                  onClick={() => setSelectedQuestionIndex(idx)}
-                  className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                    idx === selectedQuestionIndex
-                      ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-500 text-slate-900 dark:text-white shadow-md'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
-                >
-                  <div className="truncate pr-2">
-                    <div className="text-xs font-bold truncate">Q{idx + 1}. {q.title}</div>
-                    <div className="text-[10px] text-slate-500">{q.marks} pts • {q.difficulty}</div>
-                  </div>
+            <div className="space-y-2" onDragLeave={() => setDragOverIndex(null)}>
+              {questions.map((q, idx) => {
+                const isSelected = idx === selectedQuestionIndex;
+                const isDragging = idx === draggedIndex;
+                const isDragOver = idx === dragOverIndex && draggedIndex !== idx;
 
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteQuestion(idx);
-                    }}
-                    className="text-slate-400 hover:text-rose-500 p-1"
-                    title="Delete Question"
+                return (
+                  <div
+                    key={q.id || idx}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDragLeave={(e) => handleDragLeave(e, idx)}
+                    onDrop={(e) => handleDrop(e, idx)}
+                    onDragEnd={handleDragEnd}
+                    onClick={() => setSelectedQuestionIndex(idx)}
+                    className={`group relative p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all duration-150 select-none ${
+                      isDragging
+                        ? 'opacity-40 scale-[0.98] border-dashed border-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/20'
+                        : isDragOver
+                        ? 'border-t-2 border-t-indigo-500 border-indigo-300 dark:border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 shadow-sm'
+                        : isSelected
+                        ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-500 text-slate-900 dark:text-white shadow-md'
+                        : 'bg-white dark:bg-[#121214] border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-slate-300 dark:hover:border-zinc-700'
+                    }`}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                    <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
+                      {/* Drag Handle */}
+                      <div
+                        className="text-slate-400 dark:text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-grab active:cursor-grabbing p-0.5 -ml-1 rounded transition-colors"
+                        title="Drag to reorder sequence"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <GripVertical className="w-4 h-4" />
+                      </div>
+
+                      <div className="truncate flex-1">
+                        <div className="text-xs font-bold truncate flex items-center gap-1.5">
+                          <span className="text-indigo-600 dark:text-indigo-400 font-mono">Q{idx + 1}.</span>
+                          <span className="truncate">{q.title || 'Untitled Problem'}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5 flex items-center gap-1.5">
+                          <span>{q.marks || 0} pts</span>
+                          <span>•</span>
+                          <span className={`capitalize font-medium ${
+                            q.difficulty === 'easy' ? 'text-emerald-600 dark:text-emerald-400' :
+                            q.difficulty === 'hard' ? 'text-rose-600 dark:text-rose-400' :
+                            'text-amber-600 dark:text-amber-400'
+                          }`}>{q.difficulty || 'easy'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Quick Move Up/Down Buttons */}
+                      <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveQuestion(idx, idx - 1);
+                          }}
+                          className="p-0.5 text-slate-400 hover:text-indigo-600 disabled:opacity-20 disabled:hover:text-slate-400 transition-colors"
+                          title="Move question up"
+                        >
+                          <ArrowUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === questions.length - 1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveQuestion(idx, idx + 1);
+                          }}
+                          className="p-0.5 text-slate-400 hover:text-indigo-600 disabled:opacity-20 disabled:hover:text-slate-400 transition-colors"
+                          title="Move question down"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteQuestion(idx);
+                        }}
+                        className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                        title="Delete Question"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           {/* Question Editor Column (9 cols) */}
           <div className="lg:col-span-9 space-y-6">
             {activeQuestion ? (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5 shadow-xl">
+              <div className="bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 space-y-5 shadow-xl">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="sm:col-span-2 space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Question Title</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Question Title</label>
                     <input
                       type="text"
                       value={activeQuestion.title}
                       onChange={(e) => handleUpdateQuestionField('title', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Marks / Points</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Marks / Points</label>
                     <input
                       type="number"
                       value={activeQuestion.marks}
                       onChange={(e) => handleUpdateQuestionField('marks', Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Problem Description</label>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Problem Description</label>
                   <textarea
                     rows={4}
                     value={activeQuestion.description}
                     onChange={(e) => handleUpdateQuestionField('description', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none font-sans"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none font-sans"
                   />
                 </div>
 
@@ -398,29 +555,29 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Input Format</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Input Format</label>
                     <textarea
                       rows={2}
                       value={activeQuestion.input_format || ''}
                       onChange={(e) => handleUpdateQuestionField('input_format', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Output Format</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Output Format</label>
                     <textarea
                       rows={2}
                       value={activeQuestion.output_format || ''}
                       onChange={(e) => handleUpdateQuestionField('output_format', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
                     />
                   </div>
                 </div>
 
                 {/* Starter Code Template Editor (Request #3 Fix) */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
                     <Code2 className="w-4 h-4 text-indigo-500" />
                     Starter Code Template (Initial code shown to student)
                   </label>
@@ -428,23 +585,32 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
                     rows={5}
                     value={activeQuestion.starter_code || `#include <stdio.h>\n\nint main() {\n    // Write your code here\n    \n    return 0;\n}`}
                     onChange={(e) => handleUpdateQuestionField('starter_code', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
                   />
                 </div>
 
+                {/* Algorithm / Solution Approach Field with MS Word-style Smart Bullets and Numbering */}
+                <AlgorithmEditor
+                  value={activeQuestion.algorithm || ''}
+                  onChange={(val) => handleUpdateQuestionField('algorithm', val)}
+                  rows={4}
+                  label="Algorithm / Solution Approach (Optional)"
+                  badgeText="Shown to students inside AI Code Assist"
+                />
+
                 {/* Test Cases Section */}
-                <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-zinc-800">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Test Cases</h3>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Sample cases are visible to students; Hidden cases are evaluated during grading.</p>
+                      <p className="text-[11px] text-slate-500 dark:text-zinc-400">Sample cases are visible to students; Hidden cases are evaluated during grading.</p>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => handleAddTestCase(true)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-200 dark:bg-[#18181b] hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-semibold"
                       >
                         <Eye className="w-3.5 h-3.5 text-indigo-500" />
                         <span>+ Sample Case</span>
@@ -453,7 +619,7 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
                       <button
                         type="button"
                         onClick={() => handleAddTestCase(false)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-200 dark:bg-[#18181b] hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-semibold"
                       >
                         <EyeOff className="w-3.5 h-3.5 text-amber-500" />
                         <span>+ Hidden Case</span>
@@ -467,7 +633,7 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
                         key={tc.id || tcIdx}
                         className={`p-3.5 rounded-xl border text-xs space-y-2 ${
                           tc.is_sample
-                            ? 'bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800'
+                            ? 'bg-slate-50 dark:bg-[#09090b]/60 border-slate-200 dark:border-zinc-800'
                             : 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-500/30'
                         }`}
                       >
@@ -478,17 +644,17 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
                             }`}>
                               {tc.is_sample ? 'Visible Sample Case' : 'Hidden Test Case'}
                             </span>
-                            <span className="text-slate-500 dark:text-slate-400 font-mono">Case #{tcIdx + 1}</span>
+                            <span className="text-slate-500 dark:text-zinc-400 font-mono">Case #{tcIdx + 1}</span>
                           </div>
 
                           <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            <label className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-zinc-400">
                               <span>Points:</span>
                               <input
                                 type="number"
                                 value={tc.marks}
                                 onChange={(e) => handleUpdateTestCase(tc.id, 'marks', Number(e.target.value))}
-                                className="w-12 px-1.5 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white text-center font-mono"
+                                className="w-12 px-1.5 py-0.5 rounded bg-white dark:bg-[#121214] border border-slate-300 dark:border-zinc-800 text-slate-900 dark:text-white text-center font-mono"
                               />
                             </label>
 
@@ -513,7 +679,7 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
                               value={tc.input}
                               onChange={(e) => handleUpdateTestCase(tc.id, 'input', e.target.value)}
                               placeholder="e.g. 10 20"
-                              className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded text-slate-800 dark:text-slate-200 font-mono text-xs focus:outline-none focus:border-indigo-500 resize-none"
+                              className="w-full p-2 bg-white dark:bg-[#121214] border border-slate-300 dark:border-zinc-800 rounded text-slate-800 dark:text-zinc-200 font-mono text-xs focus:outline-none focus:border-indigo-500 resize-none"
                             />
                           </div>
 
@@ -526,7 +692,7 @@ export const TestEditor: React.FC<TestEditorProps> = ({ test, onSave, onCancel }
                               value={tc.expected_output}
                               onChange={(e) => handleUpdateTestCase(tc.id, 'expected_output', e.target.value)}
                               placeholder="e.g. 30"
-                              className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded text-emerald-700 dark:text-emerald-300 font-mono text-xs focus:outline-none focus:border-indigo-500 resize-none"
+                              className="w-full p-2 bg-white dark:bg-[#121214] border border-slate-300 dark:border-zinc-800 rounded text-emerald-700 dark:text-emerald-300 font-mono text-xs focus:outline-none focus:border-indigo-500 resize-none"
                             />
                           </div>
                         </div>

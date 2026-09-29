@@ -66,7 +66,7 @@ export const QuestionMediaUpload: React.FC<QuestionMediaUploadProps> = ({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+        <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
           <ImageIcon className="w-3.5 h-3.5 text-indigo-500" />
           <span>{label}</span>
         </label>
@@ -85,14 +85,14 @@ export const QuestionMediaUpload: React.FC<QuestionMediaUploadProps> = ({
       </div>
 
       {showUrlInput && (
-        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2 animate-in fade-in duration-150">
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 space-y-2 animate-in fade-in duration-150">
           <div className="flex items-center gap-2">
             <input
               type="url"
               value={manualUrl}
               onChange={(e) => setManualUrl(e.target.value)}
               placeholder="https://example.com/diagram.gif or https://...supabase.co/.../image.png"
-              className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 font-mono"
+              className="flex-1 px-3 py-1.5 bg-white dark:bg-[#121214] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 font-mono"
             />
             <button
               type="button"
@@ -123,7 +123,7 @@ export const QuestionMediaUpload: React.FC<QuestionMediaUploadProps> = ({
         /* Preview with Remove action */
         <div className="p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/40 dark:bg-indigo-950/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-16 h-16 rounded-lg bg-slate-900/10 dark:bg-black/40 border border-slate-200 dark:border-slate-800 flex items-center justify-center overflow-hidden shrink-0 group relative">
+            <div className="w-16 h-16 rounded-lg bg-slate-900/10 dark:bg-black/40 border border-slate-200 dark:border-zinc-800 flex items-center justify-center overflow-hidden shrink-0 group relative">
               <img
                 src={imageUrl}
                 alt="Question Diagram Preview"
@@ -143,7 +143,7 @@ export const QuestionMediaUpload: React.FC<QuestionMediaUploadProps> = ({
                   {imageUrl.endsWith('.gif') || imageUrl.includes('.gif') ? 'GIF Animation' : 'Image Diagram'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-sm sm:max-w-md font-mono" title={imageUrl}>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate max-w-sm sm:max-w-md font-mono" title={imageUrl}>
                 {imageUrl}
               </p>
             </div>
@@ -154,7 +154,7 @@ export const QuestionMediaUpload: React.FC<QuestionMediaUploadProps> = ({
               href={imageUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1 transition-colors"
+              className="p-1.5 rounded-lg bg-slate-200 dark:bg-[#18181b] hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-semibold flex items-center gap-1 transition-colors"
               title="Open full image in new tab"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -196,7 +196,7 @@ export const QuestionMediaUpload: React.FC<QuestionMediaUploadProps> = ({
           className={`border-2 border-dashed rounded-xl p-4 sm:p-5 flex flex-col items-center justify-center gap-2 text-center cursor-pointer transition-all ${
             isDragging
               ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40'
-              : 'border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 hover:border-indigo-400 dark:hover:border-indigo-600 hover:bg-slate-100/50 dark:hover:bg-slate-900/50'
+              : 'border-slate-300 dark:border-zinc-800 bg-slate-50/50 dark:bg-[#09090b]/40 hover:border-indigo-400 dark:hover:border-indigo-600 hover:bg-slate-100/50 dark:hover:bg-zinc-800/50'
           }`}
         >
           {isUploading ? (
@@ -217,8 +217,8 @@ export const QuestionMediaUpload: React.FC<QuestionMediaUploadProps> = ({
                 <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
                   Click to upload image or GIF
                 </span>{' '}
-                <span className="text-xs text-slate-500 dark:text-slate-400">or drag and drop</span>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                <span className="text-xs text-slate-500 dark:text-zinc-400">or drag and drop</span>
+                <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">
                   PNG, JPG, GIF, WebP, SVG (Max 15MB) • Uploaded directly to Supabase storage
                 </p>
               </div>
@@ -235,7 +235,7 @@ export const QuestionMediaUpload: React.FC<QuestionMediaUploadProps> = ({
       )}
 
       {!imageUrl && !uploadError && helperText && (
-        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+        <p className="text-[11px] text-slate-500 dark:text-zinc-400">
           {helperText}
         </p>
       )}

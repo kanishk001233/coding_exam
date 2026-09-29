@@ -78,7 +78,7 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-center items-center p-4 selection:bg-indigo-500 selection:text-white font-sans transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 flex flex-col justify-center items-center p-4 selection:bg-indigo-500 selection:text-white font-sans transition-colors">
       <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>
@@ -92,14 +92,14 @@ export const Login: React.FC = () => {
           <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
             CodeArena Instructor Portal
           </h1>
-          <p className="text-xs text-slate-600 dark:text-slate-400">
+          <p className="text-xs text-slate-600 dark:text-zinc-400">
             Sign in to manage tests, monitor students, and view assessment results
           </p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-zinc-800">
             <div className="flex items-center gap-2">
               <School className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">Instructor Login</h2>
@@ -115,31 +115,31 @@ export const Login: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Email Address</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Email Address</label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Mail className="w-4 h-4 text-slate-400 dark:text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition-colors"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Password</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Password</label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Lock className="w-4 h-4 text-slate-400 dark:text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition-colors"
                 />
               </div>
             </div>
@@ -162,7 +162,7 @@ export const Login: React.FC = () => {
         </div>
 
         {/* Bottom footer: ONLY WASM Compiler Benchmark link */}
-        <div className="text-center text-xs text-slate-600 dark:text-slate-400">
+        <div className="text-center text-xs text-slate-600 dark:text-zinc-400">
           <Link
             to="/wasm-diagnostics"
             className="hover:text-emerald-600 dark:hover:text-emerald-400 underline underline-offset-4 transition-colors"

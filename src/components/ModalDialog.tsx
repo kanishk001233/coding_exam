@@ -66,16 +66,16 @@ export const ModalDialog: React.FC<ModalDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scaleUp">
+      <div className="bg-white dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scaleUp">
         <div className="flex items-start gap-3.5">
-          <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0">
+          <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-zinc-800 shrink-0">
             {renderIcon()}
           </div>
           <div className="space-y-1 flex-1">
             <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
               {title}
             </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
               {message}
             </p>
           </div>
@@ -95,13 +95,13 @@ export const ModalDialog: React.FC<ModalDialogProps> = ({
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-zinc-800">
           {(type === 'confirm' || onCancel) && (
             <button
               type="button"
               disabled={isLoading}
               onClick={handleCancel}
-              className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {cancelText}
             </button>
