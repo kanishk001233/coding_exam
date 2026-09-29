@@ -816,7 +816,7 @@ class DatabaseService {
     }
 
     localStorage.setItem(this.helpRequestsKey, JSON.stringify(list));
-    this.notifyHelpUpdate();
+    this.notifyHelpUpdate('new', req);
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -829,13 +829,13 @@ class DatabaseService {
     return req;
   }
 
-  private notifyHelpUpdate(): void {
+  private notifyHelpUpdate(action: 'new' | 'cancel' | 'resolve' | 'delete' | 'clear' | 'update' = 'update', payload?: any): void {
     if (typeof window !== 'undefined') {
       try {
-        window.dispatchEvent(new CustomEvent('codearena_help_update'));
+        window.dispatchEvent(new CustomEvent('codearena_help_update', { detail: { action, payload } }));
         const bc = (window as any).__codearena_help_bc || new BroadcastChannel('codearena_help_channel');
         (window as any).__codearena_help_bc = bc;
-        bc.postMessage({ type: 'help_update', timestamp: Date.now() });
+        bc.postMessage({ type: 'help_update', action, payload, timestamp: Date.now() });
       } catch {}
     }
   }
@@ -845,7 +845,7 @@ class DatabaseService {
       r => !(r.attempt_id === attemptId && r.status === 'pending')
     );
     localStorage.setItem(this.helpRequestsKey, JSON.stringify(list));
-    this.notifyHelpUpdate();
+    this.notifyHelpUpdate('cancel');
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -864,7 +864,7 @@ class DatabaseService {
     const list = this.getHelpRequests();
     const updated = list.map(r => (r.id === id ? { ...r, status: 'resolved' as const } : r));
     localStorage.setItem(this.helpRequestsKey, JSON.stringify(updated));
-    this.notifyHelpUpdate();
+    this.notifyHelpUpdate('resolve', { id });
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -881,6 +881,7 @@ class DatabaseService {
   public async deleteHelpRequest(id: string): Promise<void> {
     const list = this.getHelpRequests().filter(r => r.id !== id);
     localStorage.setItem(this.helpRequestsKey, JSON.stringify(list));
+    this.notifyHelpUpdate('delete', { id });
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -902,6 +903,7 @@ class DatabaseService {
       list = [];
     }
     localStorage.setItem(this.helpRequestsKey, JSON.stringify(list));
+    this.notifyHelpUpdate('clear');
 
     if (isSupabaseConfigured && supabase) {
       try {

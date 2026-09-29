@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Test, TestAttempt, Question, TestCase, HelpRequest } from '../types/database';
 import { mockDb } from '../lib/mockDb';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { playTingNotification } from '../lib/soundHelper';
 import { StudentList } from '../components/StudentList';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
@@ -10,7 +11,7 @@ import {
   Plus, Play, Pause, BarChart2, BookOpen, Clock, Users, Key, LogOut, Trash2, Edit3,
   Code2, Eye, EyeOff, ShieldAlert, Maximize2, Hand, MessageSquare, Check, X, Bell,
   HelpCircle, CheckCircle2, Loader2, Search, Copy, CheckCheck, Sparkles, Filter,
-  AlertCircle, Share2, Layers, ChevronRight, Activity, Terminal, Shield
+  AlertCircle, Share2, Layers, ChevronRight, Activity, Terminal, Shield, Volume2
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -51,6 +52,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [helpRequests, setHelpRequests] = useState<HelpRequest[]>(() => mockDb.getHelpRequests());
   const [isHelpDrawerOpen, setIsHelpDrawerOpen] = useState(false);
 
+  // Tracking refs to play chime only for NEW incoming pending requests
+  const prevPendingIdsRef = useRef<Set<string>>(
+    new Set(mockDb.getHelpRequests().filter(r => r.status === 'pending').map(r => r.id))
+  );
+  const isInitialMountRef = useRef(true);
+
   // Dialog States
   const [testToDelete, setTestToDelete] = useState<Test | null>(null);
   const [bankQToDelete, setBankQToDelete] = useState<string | null>(null);
@@ -62,8 +69,23 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [showBankModal, setShowBankModal] = useState(false);
   const [isSavingBankQ, setIsSavingBankQ] = useState(false);
 
-  const fetchHelpRequests = () => {
-    setHelpRequests(mockDb.getHelpRequests());
+  const fetchHelpRequests = (options?: { playSoundIfNew?: boolean }) => {
+    const latest = mockDb.getHelpRequests();
+    setHelpRequests(latest);
+
+    const pendingRequests = latest.filter(r => r.status === 'pending');
+    const currentPendingIds = new Set(pendingRequests.map(r => r.id));
+
+    if (!isInitialMountRef.current) {
+      const hasNewPending = pendingRequests.some(r => !prevPendingIdsRef.current.has(r.id));
+      if (hasNewPending || options?.playSoundIfNew) {
+        playTingNotification();
+      }
+    } else {
+      isInitialMountRef.current = false;
+    }
+
+    prevPendingIdsRef.current = currentPendingIds;
   };
 
   const fetchLiveAttempts = async () => {
@@ -124,8 +146,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     refreshData();
 
     // 1. Instant local BroadcastChannel & CustomEvent listeners (0ms instant sync)
-    const handleInstantHelpUpdate = () => {
-      fetchHelpRequests();
+    const handleInstantHelpUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const isNew = customEvent?.detail?.action === 'new';
+      if (isNew) {
+        playTingNotification();
+      }
+      fetchHelpRequests({ playSoundIfNew: isNew });
     };
 
     window.addEventListener('codearena_help_update', handleInstantHelpUpdate);
@@ -134,8 +161,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
         bc = new BroadcastChannel('codearena_help_channel');
-        bc.onmessage = () => {
-          fetchHelpRequests();
+        bc.onmessage = (ev) => {
+          const isNew = ev.data?.action === 'new';
+          if (isNew) {
+            playTingNotification();
+          }
+          fetchHelpRequests({ playSoundIfNew: isNew });
         };
       } catch {}
     }
@@ -149,9 +180,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'help_requests' },
-            async () => {
+            async (payload: any) => {
+              if (payload.eventType === 'INSERT' && payload.new?.status === 'pending') {
+                playTingNotification();
+              }
               await mockDb.syncFromSupabase();
-              fetchHelpRequests();
+              fetchHelpRequests({ playSoundIfNew: payload.eventType === 'INSERT' });
             }
           )
           .on(
@@ -1413,9 +1447,20 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
               {/* Queue Controls Bar */}
               <div className="px-5 py-2.5 bg-slate-100/70 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs">
-                <span className="text-slate-500 dark:text-slate-400 font-semibold">
-                  Queue Order (First Come, First Served)
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 dark:text-slate-400 font-semibold">
+                    Queue Order
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => playTingNotification()}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer"
+                    title="Test incoming alert chime"
+                  >
+                    <Volume2 className="w-3 h-3" />
+                    <span>Test Ting</span>
+                  </button>
+                </div>
                 {helpRequests.length > 0 && (
                   <button
                     type="button"
