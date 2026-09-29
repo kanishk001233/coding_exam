@@ -117,8 +117,8 @@ export const StudentTest: React.FC<StudentTestProps> = ({
       }
     }
 
-    // 3. Background interval fallback
-    const interval = setInterval(checkHelpStatus, 2000);
+    // 3. Background interval fallback (5s)
+    const interval = setInterval(checkHelpStatus, 5000);
 
     return () => {
       clearInterval(interval);
@@ -501,9 +501,9 @@ export const StudentTest: React.FC<StudentTestProps> = ({
         type="confirm"
         isDestructive={true}
         isLoading={isFinishing}
-        loadingText="Submitting test & finalizing results..."
-        title="Finish & Submit Examination"
-        message="Are you sure you want to finish and submit the test? You cannot make further edits."
+        loadingText="Submitting assessment & finalizing results..."
+        title="Finish & Submit Assessment"
+        message="Are you sure you want to finish and submit the assessment? You cannot make further edits."
         confirmText="Finish & Submit"
         cancelText="Continue Test"
         onConfirm={handleFinishTest}

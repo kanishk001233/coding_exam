@@ -24,14 +24,21 @@ export const Results: React.FC<ResultsProps> = ({
   const questions = test.questions || [];
   const maxPossibleMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
 
-  // Real-time polling for teacher dashboard results
+  // Real-time polling for teacher dashboard results (relaxed interval)
   React.useEffect(() => {
+    let isRefreshing = false;
     const refresh = async () => {
-      await mockDb.syncFromSupabase();
-      setAllAttempts(mockDb.getAttempts(test.id));
+      if (isRefreshing) return;
+      isRefreshing = true;
+      try {
+        await mockDb.syncFromSupabase();
+        setAllAttempts(mockDb.getAttempts(test.id));
+      } finally {
+        isRefreshing = false;
+      }
     };
     refresh();
-    const interval = setInterval(refresh, 2000);
+    const interval = setInterval(refresh, 6000);
     return () => clearInterval(interval);
   }, [test.id]);
 

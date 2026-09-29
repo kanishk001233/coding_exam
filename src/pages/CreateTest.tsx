@@ -301,8 +301,8 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Cancel & Back</span>
             </button>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white">Create New C Coding Test</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Configure exam parameters, add custom questions, or pick from question bank</p>
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white">Create New C Coding Assessment</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Configure assessment parameters, add custom questions, or pick from question bank</p>
           </div>
 
           <ThemeToggle />
@@ -311,10 +311,10 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
         <form onSubmit={handleCreate} className="space-y-6">
           {/* Main Details Card */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Test Configuration</h2>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Assessment Configuration</h2>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Test Title</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Assessment Title</label>
               <input
                 type="text"
                 required
@@ -326,7 +326,7 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Description / Exam Instructions</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Description / Assessment Instructions</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}

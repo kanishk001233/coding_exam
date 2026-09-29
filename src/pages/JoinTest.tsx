@@ -3,8 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { Test, TestAttempt } from '../types/database';
 import { mockDb } from '../lib/mockDb';
 import { wasmCompiler } from '../lib/wasm/compiler';
-import { KeyRound, User, Hash, ArrowRight, Clock, BookOpen, AlertCircle, ShieldCheck, Loader2 } from 'lucide-react';
+import {
+  KeyRound, User, Hash, ArrowRight, Clock, BookOpen, AlertCircle,
+  ShieldCheck, Loader2, Terminal, Sparkles, CheckCircle2, ShieldAlert, Cpu
+} from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
+
+const CODING_QUOTES = [
+  "Great programmers aren’t born. They debug their way there.",
+  "The best way to learn coding is to write code.",
+  "Don’t just learn to code. Learn to think.",
+  "Every problem is an opportunity to write better code.",
+  "First solve the problem. Then write the code.",
+  "A coder’s journey begins with a single line.",
+];
 
 export const JoinTest: React.FC = () => {
   const navigate = useNavigate();
@@ -16,6 +28,34 @@ export const JoinTest: React.FC = () => {
   const [isJoining, setIsJoining] = useState(false);
   const [selectedTest, setSelectedTest] = useState<Test | null>(null);
 
+  // Typewriter State for Left Hero Section
+  const [quoteIdx, setQuoteIdx] = useState(0);
+  const [displayText, setDisplayText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const currentQuote = CODING_QUOTES[quoteIdx];
+    let timer: NodeJS.Timeout;
+
+    if (!isDeleting && displayText === currentQuote) {
+      // Pause at full text
+      timer = setTimeout(() => setIsDeleting(true), 2500);
+    } else if (isDeleting && displayText === '') {
+      // Finished deleting, move to next quote
+      setIsDeleting(false);
+      setQuoteIdx((prev) => (prev + 1) % CODING_QUOTES.length);
+    } else {
+      // Typing or deleting
+      const nextLength = isDeleting ? displayText.length - 1 : displayText.length + 1;
+      const speed = isDeleting ? 25 : 50;
+      timer = setTimeout(() => {
+        setDisplayText(currentQuote.substring(0, nextLength));
+      }, speed);
+    }
+
+    return () => clearTimeout(timer);
+  }, [displayText, isDeleting, quoteIdx]);
+
   useEffect(() => {
     wasmCompiler.initialize().then(() => {
       setIsWasmReady(true);
@@ -23,7 +63,7 @@ export const JoinTest: React.FC = () => {
   }, []);
 
   const handleTestCodeChange = (code: string) => {
-    const uppercaseCode = code.toUpperCase();
+    const uppercaseCode = code.toUpperCase().trim();
     setTestCode(uppercaseCode);
     const matched = mockDb.getTestByJoinCode(uppercaseCode);
     if (matched) {
@@ -39,12 +79,12 @@ export const JoinTest: React.FC = () => {
     setError(null);
 
     if (!testCode.trim()) {
-      setError('Please enter a valid Test Code provided by your instructor.');
+      setError('Please enter the Test Join Code provided by your instructor.');
       return;
     }
 
     if (!studentName.trim() || !rollNo.trim()) {
-      setError('Please provide your full name and UID.');
+      setError('Please provide both your Full Name and Student UID.');
       return;
     }
 
@@ -54,7 +94,7 @@ export const JoinTest: React.FC = () => {
       await mockDb.syncFromSupabase();
       const test = mockDb.getTestByJoinCode(testCode);
       if (!test) {
-        setError(`No test found with code "${testCode}". Please check with your instructor.`);
+        setError(`No exam found with code "${testCode}". Please verify with your teacher.`);
         setIsJoining(false);
         return;
       }
@@ -63,8 +103,8 @@ export const JoinTest: React.FC = () => {
       if (test.status === 'ended' || test.status === 'draft') {
         setError(
           test.status === 'ended'
-            ? 'This examination has been concluded/closed by the instructor. New attempts or edits are no longer accepted.'
-            : 'This test is currently in draft mode and has not been started yet by the instructor.'
+            ? 'This examination has been concluded by the instructor. New attempts are no longer accepted.'
+            : 'This test is in draft mode and has not yet been started by the instructor.'
         );
         setIsJoining(false);
         return;
@@ -78,7 +118,7 @@ export const JoinTest: React.FC = () => {
       // Check 2: Student already completed & submitted test
       if (existing && (existing.status === 'submitted' || existing.status === 'auto_submitted')) {
         setError(
-          `You (UID: ${existing.student_roll_no}) have already completed and submitted this examination. Re-access is not allowed.`
+          `Student UID "${existing.student_roll_no}" has already submitted this test. Multiple attempts are not permitted.`
         );
         setIsJoining(false);
         return;
@@ -107,54 +147,98 @@ export const JoinTest: React.FC = () => {
 
       navigate('/student/test');
     } catch (err: any) {
-      setError(err?.message || 'Failed to start examination. Please try again.');
+      setError(err?.message || 'Failed to initialize exam environment. Please try again.');
       setIsJoining(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-center items-center p-4 selection:bg-indigo-500 selection:text-white font-sans transition-colors relative">
-      {/* Top Left: Small Subtle Status Text as requested */}
-      <div className="absolute top-4 left-4 flex items-center gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
-        <span className={`w-2 h-2 rounded-full ${isWasmReady ? 'bg-emerald-500' : 'bg-amber-500 animate-ping'}`} />
-        <span>Compiler Engine: {isWasmReady ? 'Ready' : 'Initializing...'}</span>
-      </div>
-
-      {/* Top Right: Theme Toggle */}
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
-      <div className="w-full max-w-lg space-y-6">
-        {/* Brand */}
-        <div className="text-center space-y-1">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white font-black text-xl shadow-lg shadow-indigo-500/25 mb-2">
-            CA
-          </div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-            CodeArena
-          </h1>
-          <p className="text-xs text-slate-600 dark:text-slate-400">
-            Enter your test code and student details to begin your examination
-          </p>
+    <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex selection:bg-indigo-500 selection:text-white font-sans transition-colors">
+      {/* LEFT HERO PANEL (Split-screen on md/lg screens) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-700 via-indigo-700 to-indigo-900 text-white p-12 xl:p-16 flex-col justify-between relative overflow-hidden">
+        {/* Subtle geometric line curves in background */}
+        <div className="absolute inset-0 opacity-15 pointer-events-none">
+          <svg className="w-full h-full" viewBox="0 0 600 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="200" r="300" stroke="white" strokeWidth="1.5" strokeDasharray="6 6" />
+            <circle cx="50" cy="250" r="450" stroke="white" strokeWidth="1.5" />
+            <path d="M-100,500 C150,300 400,600 700,400" stroke="white" strokeWidth="2" />
+            <path d="M-50,600 C200,400 450,700 750,500" stroke="white" strokeWidth="1.5" strokeDasharray="8 8" />
+          </svg>
         </div>
 
-        {/* Join Card */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+        {/* Top Icon Badge */}
+        <div className="relative z-10">
+          <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-xl shadow-indigo-950/40">
+            <Sparkles className="w-7 h-7 text-white" />
+          </div>
+        </div>
+
+        {/* Center Main Headline & Typewriter Quote */}
+        <div className="relative z-10 space-y-6 max-w-lg my-auto py-10">
+          <h1 className="text-5xl xl:text-7xl font-black tracking-tight leading-tight text-white drop-shadow-sm">
+            Hello<br />
+            Folks!
+          </h1>
+
+          <div className="min-h-[5rem] flex items-center">
+            <p className="text-lg xl:text-2xl text-blue-100/95 font-medium leading-relaxed italic tracking-wide">
+              &ldquo;{displayText}&rdquo;
+              <span className="inline-block w-0.5 h-6 ml-1.5 bg-white animate-pulse align-middle" />
+            </p>
+          </div>
+        </div>
+
+        {/* Bottom Copyright Info */}
+        <div className="relative z-10 flex items-center justify-between text-xs text-blue-200/70 pt-6 border-t border-white/10">
+          <span>© 2026 CodeArena. All rights reserved.</span>
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${isWasmReady ? 'bg-emerald-400' : 'bg-amber-400 animate-ping'}`} />
+            <span className="font-mono text-[11px]">WASM: {isWasmReady ? 'Ready' : 'Booting...'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT FORM PANEL (Enlarged Typography & Inputs) */}
+      <div className="w-full lg:w-1/2 flex flex-col justify-between p-6 sm:p-10 lg:p-14 xl:p-16 min-h-screen">
+        {/* Top Navbar Row (Theme Changer Only) */}
+        <div className="flex items-center justify-end">
+          <ThemeToggle />
+        </div>
+
+        {/* Center Form Section (Enlarged Text & Inputs) */}
+        <div className="w-full max-w-lg mx-auto my-auto py-8 space-y-7">
+          <div className="space-y-2">
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+              Welcome Student!
+            </h2>
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+              Enter your assessment join code and student credentials below.
+            </p>
+          </div>
+
           {error && (
-            <div className="p-3 rounded-lg bg-rose-100 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-500/40 text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
+            <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-sm flex items-start gap-3 animate-in fade-in">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-rose-500" />
+              <span className="font-medium leading-relaxed">{error}</span>
             </div>
           )}
 
-          <form onSubmit={handleJoin} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Test Code (Provided by Teacher)
-              </label>
+          <form onSubmit={handleJoin} className="space-y-5">
+            {/* Assessment Join Code */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                  Assessment Join Code *
+                </label>
+                {selectedTest && (
+                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Verified Assessment Found
+                  </span>
+                )}
+              </div>
               <div className="relative">
-                <KeyRound className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <KeyRound className="w-5 h-5 text-indigo-500 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   required
@@ -162,90 +246,113 @@ export const JoinTest: React.FC = () => {
                   value={testCode}
                   onChange={(e) => handleTestCodeChange(e.target.value)}
                   placeholder="e.g. C2026A"
-                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs font-mono uppercase text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors font-bold disabled:opacity-60"
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-base font-mono uppercase font-bold tracking-widest text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-60"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Student Full Name</label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    disabled={isJoining}
-                    value={studentName}
-                    onChange={(e) => setStudentName(e.target.value)}
-                    placeholder="e.g. Rahul Sharma"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors disabled:opacity-60"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">UID</label>
-                <div className="relative">
-                  <Hash className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    disabled={isJoining}
-                    value={rollNo}
-                    onChange={(e) => setRollNo(e.target.value)}
-                    placeholder="26bcs11111"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors lowercase disabled:opacity-60"
-                  />
-                </div>
+            {/* Student Full Name */}
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                Student Full Name *
+              </label>
+              <div className="relative">
+                <User className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  disabled={isJoining}
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  placeholder="e.g. Rahul Sharma"
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm sm:text-base font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-60"
+                />
               </div>
             </div>
 
+            {/* Student UID */}
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                Student UID / Roll No *
+              </label>
+              <div className="relative">
+                <Hash className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  disabled={isJoining}
+                  value={rollNo}
+                  onChange={(e) => setRollNo(e.target.value)}
+                  placeholder="e.g. 26BCS10145"
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm sm:text-base font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all uppercase disabled:opacity-60"
+                />
+              </div>
+            </div>
+
+            {/* Live Matched Assessment Preview Box */}
             {selectedTest && (
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800/80 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-900 dark:text-white">{selectedTest.title}</span>
-                  <span className="px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/30 text-[11px] font-semibold">
+              <div className="p-4 sm:p-5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-500/30 space-y-3 animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-sm text-indigo-950 dark:text-indigo-200 truncate pr-2">
+                    {selectedTest.title}
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-md bg-indigo-200/60 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300 text-xs font-bold uppercase tracking-wider shrink-0">
                     {selectedTest.status}
                   </span>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-indigo-500" />
-                    {selectedTest.duration_minutes} Minutes
+
+                <div className="flex items-center justify-between text-xs sm:text-sm text-slate-600 dark:text-slate-400 pt-2 border-t border-indigo-200/60 dark:border-indigo-800/40">
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <Clock className="w-4 h-4 text-indigo-500" />
+                    {selectedTest.duration_minutes} Mins
                   </span>
-                  <span className="flex items-center gap-1">
-                    <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <BookOpen className="w-4 h-4 text-emerald-500" />
                     {selectedTest.questions?.length || 0} Questions
                   </span>
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-                    Anti-Cheat Active
+                  <span className="flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
+                    <ShieldCheck className="w-4 h-4" />
+                    Proctored
                   </span>
                 </div>
               </div>
             )}
 
+            {/* Main Action Button */}
             <button
               type="submit"
               disabled={!isWasmReady || isJoining}
-              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="w-full py-4 px-5 rounded-2xl bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {isJoining ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>Preparing Examination Environment...</span>
+                  <Loader2 className="w-5 h-5 animate-spin text-white" />
+                  <span>Preparing Assessment Environment...</span>
                 </>
               ) : (
                 <>
-                  <span>Start Examination</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Enter Assessment Hall</span>
+                  <ArrowRight className="w-5 h-5" />
                 </>
               )}
             </button>
           </form>
+
+          {/* Anti-cheat guidelines note */}
+          <div className="pt-1 text-center">
+            <p className="text-xs text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1.5">
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+              <span>Fullscreen mode & tab switch integrity monitoring enabled</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Bottom Helper Bar */}
+        <div className="text-center text-xs text-slate-400 dark:text-slate-600 pt-4 border-t border-slate-100 dark:border-slate-900">
+          <span>Need help joining? Contact your course instructor or assessment invigilator.</span>
         </div>
       </div>
     </div>
   );
 };
+

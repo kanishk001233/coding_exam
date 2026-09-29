@@ -6,7 +6,12 @@ import { StudentList } from '../components/StudentList';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
 import { QuestionMediaUpload } from '../components/QuestionMediaUpload';
-import { Plus, Play, Pause, BarChart2, BookOpen, Clock, Users, Key, LogOut, Trash2, Edit3, Code2, Eye, EyeOff, ShieldAlert, Maximize2, Hand, MessageSquare, Check, X, Bell, HelpCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import {
+  Plus, Play, Pause, BarChart2, BookOpen, Clock, Users, Key, LogOut, Trash2, Edit3,
+  Code2, Eye, EyeOff, ShieldAlert, Maximize2, Hand, MessageSquare, Check, X, Bell,
+  HelpCircle, CheckCircle2, Loader2, Search, Copy, CheckCheck, Sparkles, Filter,
+  AlertCircle, Share2, Layers, ChevronRight, Activity, Terminal, Shield
+} from 'lucide-react';
 
 interface TeacherDashboardProps {
   user: { id: string; name: string; email: string };
@@ -34,6 +39,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'tests' | 'monitor' | 'bank'>('tests');
   const [attempts, setAttempts] = useState<TestAttempt[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Search & Filter State
+  const [testSearch, setTestSearch] = useState('');
+  const [testStatusFilter, setTestStatusFilter] = useState<'all' | 'live' | 'scheduled' | 'draft' | 'ended'>('all');
+  const [bankSearch, setBankSearch] = useState('');
+  const [bankDifficultyFilter, setBankDifficultyFilter] = useState<'all' | 'easy' | 'medium' | 'hard'>('all');
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
 
   // Classroom Assistance Help Queue State
   const [helpRequests, setHelpRequests] = useState<HelpRequest[]>(() => mockDb.getHelpRequests());
@@ -69,6 +81,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     setIsRefreshing(true);
     await fetchLiveAttempts();
     setTimeout(() => setIsRefreshing(false), 500);
+  };
+
+  const handleCopyJoinCode = (test: Test, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(test.join_code);
+    setCopiedCodeId(test.id);
+    setTimeout(() => setCopiedCodeId(null), 2000);
   };
 
   const handleResolveHelp = async (id: string) => {
@@ -153,10 +172,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       }
     }
 
-    // 3. Fast fallback interval polling (1.5s)
+    // 3. Relaxed fallback interval polling (6s) to avoid overloading Supabase Realtime
+    let isSyncing = false;
     const interval = setInterval(async () => {
-      await fetchLiveAttempts();
-    }, 1500);
+      if (isSyncing) return;
+      isSyncing = true;
+      try {
+        await fetchLiveAttempts();
+      } finally {
+        isSyncing = false;
+      }
+    }, 6000);
 
     return () => {
       clearInterval(interval);
@@ -263,7 +289,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       input_format: '',
       output_format: '',
       constraints: '1 <= N <= 10^5',
-      starter_code: `#include <stdio.h>\n\nint main() {\n    //write your code here\n    return 0;\n}`,
+      starter_code: `#include <stdio.h>\n\nint main() {\n    // Write your code here\n    \n    return 0;\n}`,
       test_cases: [
         {
           id: 'tc-' + Math.random().toString(36).substring(2, 9),
@@ -320,225 +346,452 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     }
   };
 
+  // Filtered Tests
+  const filteredTests = tests.filter((t) => {
+    const matchesSearch =
+      t.title.toLowerCase().includes(testSearch.toLowerCase()) ||
+      t.join_code.toLowerCase().includes(testSearch.toLowerCase()) ||
+      (t.description && t.description.toLowerCase().includes(testSearch.toLowerCase()));
+    const matchesStatus = testStatusFilter === 'all' || t.status === testStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  // Filtered Bank Questions
+  const filteredBankQuestions = bankQuestions.filter((q) => {
+    const matchesSearch =
+      q.title.toLowerCase().includes(bankSearch.toLowerCase()) ||
+      q.description.toLowerCase().includes(bankSearch.toLowerCase());
+    const matchesDifficulty = bankDifficultyFilter === 'all' || q.difficulty === bankDifficultyFilter;
+    return matchesSearch && matchesDifficulty;
+  });
+
+  // Top Statistics Calculations
+  const liveTestsCount = tests.filter((t) => t.status === 'live').length;
+  const totalStudentsAcrossTests = tests.reduce((sum, t) => sum + mockDb.getAttempts(t.id).length, 0);
+  const pendingHelpCount = helpRequests.filter((r) => r.status === 'pending').length;
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors selection:bg-indigo-500 selection:text-white">
       {/* Top Navbar */}
-      <nav className="bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex items-center justify-between sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white font-black text-sm shadow-md shadow-indigo-500/20">
-            CA
-          </div>
-          <div>
-            <h1 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-              CodeArena Instructor Dashboard
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-              {user.name} ({user.email})
-            </p>
-          </div>
-        </div>
+      <nav className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-30 shadow-xs">
+        {/* Top Decorative Gradient Accent */}
+        <div className="h-[3px] w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600" />
 
-        <div className="flex items-center gap-3">
-          {/* Help Queue Trigger Button */}
-          <button
-            type="button"
-            onClick={() => setIsHelpDrawerOpen(true)}
-            className={`relative flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-sm ${
-              helpRequests.filter(r => r.status === 'pending').length > 0
-                ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30 animate-pulse border border-amber-400'
-                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700'
-            }`}
-            title="Open Student Offline Help Queue"
-          >
-            <Hand className="w-4 h-4" />
-            <span className="hidden sm:inline">Help Queue</span>
-            {helpRequests.filter(r => r.status === 'pending').length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black border border-white dark:border-slate-900">
-                {helpRequests.filter(r => r.status === 'pending').length}
+        <div className="px-5 sm:px-8 py-3 flex items-center justify-between">
+          {/* Left Brand & Title */}
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-blue-600 flex items-center justify-center text-white font-black text-base shadow-md shadow-indigo-600/25 ring-2 ring-indigo-500/20">
+              <Terminal className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-black text-slate-900 dark:text-white tracking-tight">
+                  CodeArena
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/80 dark:to-blue-950/80 border border-indigo-200/80 dark:border-indigo-500/30 text-indigo-700 dark:text-indigo-300 text-[10px] font-black tracking-wider uppercase">
+                  Instructor
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
+                <span>Assessment Command Center</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Right Actions & Profile */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* Help Queue Trigger Button */}
+            <button
+              type="button"
+              onClick={() => setIsHelpDrawerOpen(true)}
+              className={`relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs ${
+                pendingHelpCount > 0
+                  ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-amber-500/30 ring-2 ring-amber-400/40 animate-pulse'
+                  : 'bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80'
+              }`}
+              title="Open Student Offline Help Queue"
+            >
+              <Hand className="w-4 h-4" />
+              <span className="hidden md:inline">Help Queue</span>
+              {pendingHelpCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-white text-rose-600 text-[11px] font-black shadow-xs">
+                  {pendingHelpCount}
+                </span>
+              )}
+            </button>
+
+            {/* Database Connection Pill */}
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium border bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-800">
+              <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-amber-500 animate-ping'}`} />
+              <span className="text-slate-600 dark:text-slate-300">
+                {isSupabaseConfigured ? 'Database Synced' : 'Local Storage Mode'}
               </span>
-            )}
-          </button>
+            </div>
 
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-800">
-            <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500' : 'bg-amber-500 animate-ping'}`} />
-            <span className="text-slate-600 dark:text-slate-400">
-              {isSupabaseConfigured ? 'Supabase Connected' : 'Local Storage Mode (No .env keys)'}
-            </span>
+            {/* User Profile Pill */}
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800">
+              <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold uppercase">
+                {user.name ? user.name[0] : 'T'}
+              </div>
+              <div className="text-left">
+                <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 leading-none">{user.name}</span>
+                <span className="block text-[10px] text-slate-400 dark:text-slate-500 leading-none mt-0.5">{user.email}</span>
+              </div>
+            </div>
+
+            <ThemeToggle />
+
+            <button
+              type="button"
+              onClick={onNavigateDiagnostics}
+              className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors hidden lg:flex items-center gap-1.5 border border-slate-200 dark:border-slate-700/60 cursor-pointer"
+            >
+              <Activity className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Benchmark</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onJoinAsStudent}
+              className="px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Student View</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onLogout}
+              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-500 dark:text-slate-400 transition-colors border border-slate-200 dark:border-slate-700/60 cursor-pointer"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-
-          <ThemeToggle />
-
-          <button
-            type="button"
-            onClick={onNavigateDiagnostics}
-            className="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors hidden sm:block"
-          >
-            WASM Benchmark
-          </button>
-
-          <button
-            type="button"
-            onClick={onJoinAsStudent}
-            className="px-3 py-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-950 hover:bg-indigo-200 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/30 text-xs font-semibold transition-colors"
-          >
-            Student Join Screen
-          </button>
-
-          <button
-            type="button"
-            onClick={onLogout}
-            className="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-slate-400 transition-colors"
-            title="Sign Out"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
         </div>
       </nav>
 
       {/* Main Container */}
-      <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-6">
-        {/* Navigation Tabs */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-2 bg-slate-200/70 dark:bg-slate-900 p-1 rounded-xl border border-slate-300 dark:border-slate-800">
+      <div className="max-w-7xl mx-auto p-5 sm:p-8 space-y-7">
+        {/* Top KPI Metrics Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Total Assessments
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 dark:text-white">{tests.length}</span>
+                {liveTestsCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold">
+                    {liveTestsCount} Live
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="w-11 h-11 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+              <BookOpen className="w-5 h-5" />
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Total Submissions
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 dark:text-white">{totalStudentsAcrossTests}</span>
+                <span className="text-[11px] text-slate-400">Attempts</span>
+              </div>
+            </div>
+            <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <Users className="w-5 h-5" />
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Question Bank
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 dark:text-white">{bankQuestions.length}</span>
+                <span className="text-[11px] text-slate-400">Problems</span>
+              </div>
+            </div>
+            <div className="w-11 h-11 rounded-xl bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 flex items-center justify-center">
+              <Code2 className="w-5 h-5" />
+            </div>
+          </div>
+
+          <div
+            onClick={() => setIsHelpDrawerOpen(true)}
+            className={`p-4 rounded-2xl border shadow-sm flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02] ${
+              pendingHelpCount > 0
+                ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-500/40 ring-2 ring-amber-400/20'
+                : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800'
+            }`}
+          >
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Help Queue
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className={`text-2xl font-black ${pendingHelpCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>
+                  {pendingHelpCount}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {pendingHelpCount > 0 ? 'Students waiting' : 'All clear'}
+                </span>
+              </div>
+            </div>
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+              pendingHelpCount > 0
+                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30 animate-pulse'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+            }`}>
+              <Hand className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Tabs Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-slate-800/80">
+          <div className="flex items-center gap-1.5 bg-slate-200/60 dark:bg-slate-900/80 p-1.5 rounded-2xl border border-slate-300/70 dark:border-slate-800">
             <button
               type="button"
               onClick={() => setActiveTab('tests')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'tests'
-                  ? 'bg-indigo-600 text-white shadow-md'
+                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-slate-700/60'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              Coding Tests ({tests.length})
+              <BookOpen className="w-4 h-4" />
+              <span>Assessments</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-950 text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+                {tests.length}
+              </span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('monitor')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'monitor'
-                  ? 'bg-indigo-600 text-white shadow-md'
+                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-slate-700/60'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              Classroom Live Monitor
+              <Activity className="w-4 h-4" />
+              <span>Live Monitor</span>
+              {liveTestsCount > 0 && (
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              )}
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('bank')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'bank'
-                  ? 'bg-indigo-600 text-white shadow-md'
+                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-slate-700/60'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              Question Bank ({bankQuestions.length})
+              <Code2 className="w-4 h-4" />
+              <span>Question Bank</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-950 text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+                {bankQuestions.length}
+              </span>
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={onCreateTest}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create New Test</span>
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onCreateTest}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold shadow-md shadow-indigo-600/25 transition-all active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create New Assessment</span>
+            </button>
+          </div>
         </div>
 
         {/* Tab 1: Coding Tests List */}
         {activeTab === 'tests' && (
-          <div>
+          <div className="space-y-5">
+            {/* Search & Status Filters */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={testSearch}
+                  onChange={(e) => setTestSearch(e.target.value)}
+                  placeholder="Search assessments by title, join code, or description..."
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                />
+                {testSearch && (
+                  <button
+                    onClick={() => setTestSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Status Filter Chips */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                {(['all', 'live', 'scheduled', 'draft', 'ended'] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setTestStatusFilter(st)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
+                      testStatusFilter === st
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {st === 'all' ? 'All Assessments' : st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {tests.length === 0 ? (
-              <div className="p-12 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl space-y-4">
-                <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center mx-auto text-indigo-600 dark:text-indigo-400">
-                  <Plus className="w-6 h-6" />
+              <div className="p-12 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-600 dark:text-indigo-400 shadow-sm">
+                  <BookOpen className="w-7 h-7" />
                 </div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">No Tests Created Yet</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                  Click the button below to create your first classroom coding test!
-                </p>
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">No Coding Assessments Created Yet</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Design your first offline or online classroom coding assessment with automated testcase evaluation.
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={onCreateTest}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg transition-all"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/25 transition-all cursor-pointer"
                 >
-                  Create Test Now
+                  Create Assessment Now
+                </button>
+              </div>
+            ) : filteredTests.length === 0 ? (
+              <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No assessments match your search criteria</p>
+                <button
+                  type="button"
+                  onClick={() => { setTestSearch(''); setTestStatusFilter('all'); }}
+                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-bold"
+                >
+                  Reset filters
                 </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {tests.map((test) => {
+                {filteredTests.map((test) => {
                   const testAttempts = mockDb.getAttempts(test.id);
                   const isLive = test.status === 'live';
+                  const isCopied = copiedCodeId === test.id;
 
                   return (
                     <div
                       key={test.id}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-all space-y-4"
+                      className={`bg-white dark:bg-slate-900 border rounded-2xl p-5 transition-all flex flex-col justify-between space-y-4 relative ${
+                        isLive
+                          ? 'border-emerald-400 dark:border-emerald-500/70 bg-gradient-to-b from-emerald-50/30 to-white dark:from-emerald-950/10 dark:to-slate-900'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
                     >
-                      <div className="space-y-3">
+                      <div className="space-y-3.5">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-bold text-base text-slate-900 dark:text-white">{test.title}</h3>
+                          <div className="space-y-1 flex-1 min-w-0">
+                            <h3 className="font-bold text-base text-slate-900 dark:text-white truncate leading-snug">
+                              {test.title}
+                            </h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                              {test.description || 'No description provided.'}
+                            </p>
+                          </div>
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
                               isLive
-                                ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30'
+                                ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/40'
                                 : test.status === 'scheduled'
                                 ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30'
-                                : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-400'
+                                : test.status === 'ended'
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                                : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30'
                             }`}
                           >
+                            {isLive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />}
                             {test.status}
                           </span>
                         </div>
 
-                        <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">{test.description}</p>
-
-                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 space-y-2">
+                        {/* Join Code & Assessment Specs Box */}
+                        <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800/80 space-y-2.5">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                            <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium">
                               <Key className="w-3.5 h-3.5 text-indigo-500" />
                               Join Code:
                             </span>
-                            <code className="px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-mono font-bold">
-                              {test.join_code}
-                            </code>
+                            <div className="flex items-center gap-1.5">
+                              <code className="px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-mono font-bold text-xs tracking-wider border border-indigo-200 dark:border-indigo-800">
+                                {test.join_code}
+                              </code>
+                              <button
+                                type="button"
+                                onClick={(e) => handleCopyJoinCode(test, e)}
+                                className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                                  isCopied
+                                    ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 border-emerald-300'
+                                    : 'bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-800'
+                                }`}
+                                title="Copy Join Code"
+                              >
+                                {isCopied ? <CheckCheck className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
                           </div>
 
-                          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                            <span className="flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5 text-slate-400" />
-                              {test.duration_minutes} Mins
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <BookOpen className="w-3.5 h-3.5 text-slate-400" />
-                              {test.questions?.length || 0} Questions
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <Users className="w-3.5 h-3.5 text-slate-400" />
-                              {testAttempts.length} Students
-                            </span>
+                          <div className="grid grid-cols-3 gap-2 text-center text-xs py-1 border-t border-b border-slate-200/60 dark:border-slate-800/60">
+                            <div>
+                              <span className="block text-[10px] text-slate-400 uppercase font-semibold">Duration</span>
+                              <span className="font-bold text-slate-800 dark:text-slate-200">{test.duration_minutes}m</span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-slate-400 uppercase font-semibold">Questions</span>
+                              <span className="font-bold text-slate-800 dark:text-slate-200">{test.questions?.length || 0}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-slate-400 uppercase font-semibold">Students</span>
+                              <span className="font-bold text-slate-800 dark:text-slate-200">{testAttempts.length}</span>
+                            </div>
                           </div>
 
                           {/* Anti-cheat Proctoring Badges */}
-                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
+                          <div className="flex items-center justify-between gap-2 pt-0.5">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleToggleTabSwitch(test);
                               }}
-                              className={`px-2 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                              className={`flex-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
                                 test.enable_tab_switch_tracking !== false
-                                  ? 'bg-emerald-100/70 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30 hover:bg-emerald-200/70'
-                                  : 'bg-slate-200/60 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700 line-through hover:bg-slate-300/60'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100'
+                                  : 'bg-slate-100 dark:bg-slate-900 text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-200'
                               }`}
-                              title="Click to enable/disable Tab Switch tracking for this test"
+                              title="Toggle Tab-Switch Monitoring"
                             >
-                              <ShieldAlert className="w-3 h-3" />
-                              <span>Tab: {test.enable_tab_switch_tracking !== false ? 'ON' : 'OFF'}</span>
+                              <ShieldAlert className="w-3.5 h-3.5" />
+                              <span>Tab Guard: {test.enable_tab_switch_tracking !== false ? 'ON' : 'OFF'}</span>
                             </button>
 
                             <button
@@ -547,39 +800,40 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                 e.stopPropagation();
                                 handleToggleFullscreen(test);
                               }}
-                              className={`px-2 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                              className={`flex-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
                                 test.enable_fullscreen_mode !== false
-                                  ? 'bg-indigo-100/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-500/30 hover:bg-indigo-200/70'
-                                  : 'bg-slate-200/60 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700 line-through hover:bg-slate-300/60'
+                                  ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100'
+                                  : 'bg-slate-100 dark:bg-slate-900 text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-200'
                               }`}
-                              title="Click to enable/disable Fullscreen requirement for this test"
+                              title="Toggle Fullscreen Requirement"
                             >
-                              <Maximize2 className="w-3 h-3" />
+                              <Maximize2 className="w-3.5 h-3.5" />
                               <span>Fullscreen: {test.enable_fullscreen_mode !== false ? 'ON' : 'OFF'}</span>
                             </button>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                      {/* Card Action Buttons */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200/80 dark:border-slate-800">
                         <button
                           type="button"
                           onClick={() => handleToggleStatus(test)}
-                          className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
                             isLive
-                              ? 'bg-amber-100 dark:bg-amber-950/50 hover:bg-amber-200 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30'
-                              : 'bg-emerald-100 dark:bg-emerald-950/50 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30'
+                              ? 'bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40'
+                              : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-600/20'
                           }`}
                         >
                           {isLive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                          <span>{isLive ? 'End Test' : 'Start Live'}</span>
+                          <span>{isLive ? 'End Assessment' : 'Start Assessment'}</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => onViewResults(test)}
-                          className="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-700 dark:text-slate-300 transition-colors"
-                          title="View Class Results"
+                          className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-700 dark:text-slate-300 transition-all cursor-pointer border border-slate-200/80 dark:border-slate-700/60"
+                          title="View Assessment Results & Analytics"
                         >
                           <BarChart2 className="w-4 h-4" />
                         </button>
@@ -587,8 +841,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         <button
                           type="button"
                           onClick={() => onEditTest(test)}
-                          className="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
-                          title="Edit Test"
+                          className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all cursor-pointer border border-slate-200/80 dark:border-slate-700/60"
+                          title="Edit Assessment & Questions"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
@@ -596,8 +850,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         <button
                           type="button"
                           onClick={() => setTestToDelete(test)}
-                          className="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-500 dark:text-slate-400 transition-colors"
-                          title="Delete Test"
+                          className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-400 transition-all cursor-pointer border border-slate-200/80 dark:border-slate-700/60"
+                          title="Delete Assessment"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -612,32 +866,42 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
         {/* Tab 2: Live Classroom Monitor */}
         {activeTab === 'monitor' && (
-          <div>
+          <div className="space-y-5">
             {tests.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
-                Please create a test first to monitor live students.
+              <div className="p-12 text-center text-slate-500 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl">
+                Please create an assessment first to monitor live students.
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                      Monitoring: {selectedTest?.title || 'Active Test'}
-                    </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Student Join Code: <strong className="text-indigo-600 dark:text-indigo-300 font-mono">{selectedTest?.join_code}</strong>
-                    </p>
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                      <Activity className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                        Monitoring: {selectedTest?.title || 'Active Assessment'}
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Join Code: <strong className="text-indigo-600 dark:text-indigo-400 font-mono font-bold">{selectedTest?.join_code}</strong>
+                        <span className="mx-2">•</span>
+                        Status: <span className="font-bold capitalize">{selectedTest?.status}</span>
+                      </p>
+                    </div>
                   </div>
 
-                  <select
-                    value={selectedTestId}
-                    onChange={(e) => setSelectedTestId(e.target.value)}
-                    className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white"
-                  >
-                    {tests.map((t) => (
-                      <option key={t.id} value={t.id}>{t.title}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium">Select Assessment:</span>
+                    <select
+                      value={selectedTestId}
+                      onChange={(e) => setSelectedTestId(e.target.value)}
+                      className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    >
+                      {tests.map((t) => (
+                        <option key={t.id} value={t.id}>{t.title} ({t.status})</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <StudentList
@@ -653,47 +917,84 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </div>
         )}
 
-        {/* Tab 3: Question Bank Browser (Request #2: Edit Question Bank Questions) */}
+        {/* Tab 3: Question Bank Browser */}
         {activeTab === 'bank' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white">Curated C Programming Question Bank</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Create, customize, and edit reusable questions with test cases</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Manage reusable problems with verified test cases and starter templates</p>
               </div>
 
               <button
                 type="button"
                 onClick={handleOpenAddBankQ}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/25 transition-all active:scale-95 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ Add Question to Bank</span>
+                <span>Add Question to Bank</span>
               </button>
             </div>
 
+            {/* Search & Difficulty Filter */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={bankSearch}
+                  onChange={(e) => setBankSearch(e.target.value)}
+                  placeholder="Search problem bank..."
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {(['all', 'easy', 'medium', 'hard'] as const).map((diff) => (
+                  <button
+                    key={diff}
+                    type="button"
+                    onClick={() => setBankDifficultyFilter(diff)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
+                      bankDifficultyFilter === diff
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {diff === 'all' ? 'All Difficulties' : diff}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {bankQuestions.map((q) => (
-                <div key={q.id} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 shadow-md flex flex-col justify-between">
-                  <div className="space-y-2">
+              {filteredBankQuestions.map((q) => (
+                <div key={q.id} className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 space-y-3.5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                  <div className="space-y-2.5">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-bold text-sm text-slate-900 dark:text-white">{q.title}</h3>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold capitalize bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-snug">{q.title}</h3>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          q.difficulty === 'easy'
+                            ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
+                            : q.difficulty === 'medium'
+                            ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400'
+                            : 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400'
+                        }`}>
                           {q.difficulty} • {q.marks} pts
                         </span>
                         <button
                           type="button"
                           onClick={() => handleOpenEditBankQ(q)}
                           className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-600 dark:text-slate-300 transition-colors"
-                          title="Edit Question Bank Question"
+                          title="Edit Question"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={() => setBankQToDelete(q.id)}
-                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-500 dark:text-slate-400 transition-colors"
+                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-rose-950/60 hover:text-rose-600 dark:hover:text-rose-400 text-slate-400 transition-colors"
                           title="Delete from Question Bank"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -703,14 +1004,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
                     <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">{q.description}</p>
 
-                    <div className="p-2.5 rounded bg-slate-50 dark:bg-slate-950 text-xs font-mono text-slate-800 dark:text-slate-300 max-h-24 overflow-y-auto border border-slate-200 dark:border-slate-800">
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 text-xs font-mono text-slate-800 dark:text-slate-300 max-h-24 overflow-y-auto border border-slate-200/80 dark:border-slate-800">
                       <pre>{q.starter_code}</pre>
                     </div>
                   </div>
 
                   <div className="text-xs text-slate-500 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80">
-                    <span>{q.test_cases?.length || 0} Test Cases ({q.test_cases?.filter(t => t.is_sample).length} Sample, {q.test_cases?.filter(t => !t.is_sample).length} Hidden)</span>
-                    <span className="text-indigo-600 dark:text-indigo-400 font-semibold">C99 Verified</span>
+                    <span className="font-medium">{q.test_cases?.length || 0} Test Cases ({q.test_cases?.filter(t => t.is_sample).length} Sample, {q.test_cases?.filter(t => !t.is_sample).length} Hidden)</span>
+                    <span className="text-indigo-600 dark:text-indigo-400 font-bold">C99 Standard</span>
                   </div>
                 </div>
               ))}
