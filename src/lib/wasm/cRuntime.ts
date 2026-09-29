@@ -924,51 +924,108 @@ export class Interpreter {
         const formatStr = String(args[0]);
         let matchedCount = 0;
         let argIdx = 1;
+        let fmtIdx = 0;
 
-        // Skip leading whitespace in input buffer
-        const tokens = this.ctx.inputBuffer.slice(this.ctx.inputIndex).trimStart();
-        const skipped = this.ctx.inputBuffer.slice(this.ctx.inputIndex).length - tokens.length;
-        this.ctx.inputIndex += skipped;
+        while (fmtIdx < formatStr.length) {
+          const char = formatStr[fmtIdx];
 
-        for (let i = 0; i < formatStr.length; i++) {
-          if (formatStr[i] === '%' && i + 1 < formatStr.length) {
-            i++;
-            while (i < formatStr.length && !'diufFeEgGxXoscpa%'.includes(formatStr[i])) {
-              i++;
+          // Whitespace in format string matches 0 or more whitespace characters in input
+          if (/\s/.test(char)) {
+            while (fmtIdx < formatStr.length && /\s/.test(formatStr[fmtIdx])) {
+              fmtIdx++;
             }
-            const typeChar = formatStr[i];
-            if (argIdx >= astArgs.length) break;
+            while (this.ctx.inputIndex < this.ctx.inputBuffer.length && /\s/.test(this.ctx.inputBuffer[this.ctx.inputIndex])) {
+              this.ctx.inputIndex++;
+            }
+            continue;
+          }
 
+          if (char === '%') {
+            fmtIdx++;
+            if (fmtIdx >= formatStr.length) break;
+
+            if (formatStr[fmtIdx] === '%') {
+              if (this.ctx.inputBuffer[this.ctx.inputIndex] === '%') {
+                this.ctx.inputIndex++;
+              }
+              fmtIdx++;
+              continue;
+            }
+
+            // Parse specifiers (e.g. %d, %i, %ld, %lld, %f, %lf, %s, %c, %x, %o)
+            while (fmtIdx < formatStr.length && !'diufFeEgGxXoscpa'.includes(formatStr[fmtIdx])) {
+              fmtIdx++;
+            }
+            if (fmtIdx >= formatStr.length) break;
+            const typeChar = formatStr[fmtIdx];
+            fmtIdx++;
+
+            if (argIdx >= astArgs.length) break;
             const targetAst = astArgs[argIdx];
             argIdx++;
 
-            // Read token from input buffer
-            const remaining = this.ctx.inputBuffer.slice(this.ctx.inputIndex).trimStart();
-            if (remaining.length === 0) break; // EOF
+            // Skip leading whitespace for all specifiers except %c
+            if (typeChar !== 'c') {
+              while (this.ctx.inputIndex < this.ctx.inputBuffer.length && /\s/.test(this.ctx.inputBuffer[this.ctx.inputIndex])) {
+                this.ctx.inputIndex++;
+              }
+            }
 
-            if (typeChar === 'd' || typeChar === 'i' || typeChar === 'u' || typeChar === 'ld') {
+            if (this.ctx.inputIndex >= this.ctx.inputBuffer.length) {
+              break; // EOF
+            }
+
+            const remaining = this.ctx.inputBuffer.slice(this.ctx.inputIndex);
+
+            if (typeChar === 'd' || typeChar === 'i' || typeChar === 'u' || typeChar === 'ld' || typeChar === 'lld') {
               const match = remaining.match(/^([+-]?\d+)/);
               if (match) {
                 const num = parseInt(match[1], 10);
                 this.assignTarget(targetAst, num, scope);
-                this.ctx.inputIndex = this.ctx.inputBuffer.indexOf(match[1], this.ctx.inputIndex) + match[1].length;
+                this.ctx.inputIndex += match[0].length;
                 matchedCount++;
+              } else {
+                break;
               }
-            } else if (typeChar === 'f' || typeChar === 'lf') {
-              const match = remaining.match(/^([+-]?\d+(\.\d+)?)/);
+            } else if (typeChar === 'x' || typeChar === 'X') {
+              const match = remaining.match(/^([+-]?(0x)?[0-9a-fA-F]+)/);
+              if (match) {
+                const num = parseInt(match[1], 16);
+                this.assignTarget(targetAst, num, scope);
+                this.ctx.inputIndex += match[0].length;
+                matchedCount++;
+              } else {
+                break;
+              }
+            } else if (typeChar === 'o') {
+              const match = remaining.match(/^([+-]?[0-7]+)/);
+              if (match) {
+                const num = parseInt(match[1], 8);
+                this.assignTarget(targetAst, num, scope);
+                this.ctx.inputIndex += match[0].length;
+                matchedCount++;
+              } else {
+                break;
+              }
+            } else if (typeChar === 'f' || typeChar === 'lf' || typeChar === 'F' || typeChar === 'e' || typeChar === 'E' || typeChar === 'g' || typeChar === 'G') {
+              const match = remaining.match(/^([+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?)/);
               if (match) {
                 const num = parseFloat(match[1]);
                 this.assignTarget(targetAst, num, scope);
-                this.ctx.inputIndex = this.ctx.inputBuffer.indexOf(match[1], this.ctx.inputIndex) + match[1].length;
+                this.ctx.inputIndex += match[0].length;
                 matchedCount++;
+              } else {
+                break;
               }
             } else if (typeChar === 's') {
               const match = remaining.match(/^(\S+)/);
               if (match) {
                 const str = match[1];
                 this.assignTarget(targetAst, str, scope);
-                this.ctx.inputIndex = this.ctx.inputBuffer.indexOf(match[1], this.ctx.inputIndex) + match[1].length;
+                this.ctx.inputIndex += match[0].length;
                 matchedCount++;
+              } else {
+                break;
               }
             } else if (typeChar === 'c') {
               const ch = this.ctx.inputBuffer[this.ctx.inputIndex];
@@ -976,8 +1033,16 @@ export class Interpreter {
                 this.assignTarget(targetAst, ch.charCodeAt(0), scope);
                 this.ctx.inputIndex++;
                 matchedCount++;
+              } else {
+                break;
               }
             }
+          } else {
+            // Literal char match
+            if (this.ctx.inputBuffer[this.ctx.inputIndex] === char) {
+              this.ctx.inputIndex++;
+            }
+            fmtIdx++;
           }
         }
 
@@ -993,6 +1058,46 @@ export class Interpreter {
         const str = args[0] !== undefined ? String(args[0]) : '';
         this.appendStdout(str + '\n');
         return 0;
+      }
+    });
+
+    // gets
+    this.functions.set('gets', {
+      type: 'BuiltinFunction',
+      name: 'gets',
+      call: (args: any[], scope: Map<string, any>, astArgs: ASTNode[]) => {
+        if (this.ctx.inputIndex >= this.ctx.inputBuffer.length) return null;
+        let line = '';
+        while (this.ctx.inputIndex < this.ctx.inputBuffer.length && this.ctx.inputBuffer[this.ctx.inputIndex] !== '\n') {
+          line += this.ctx.inputBuffer[this.ctx.inputIndex++];
+        }
+        if (this.ctx.inputIndex < this.ctx.inputBuffer.length && this.ctx.inputBuffer[this.ctx.inputIndex] === '\n') {
+          this.ctx.inputIndex++;
+        }
+        if (astArgs && astArgs[0]) {
+          this.assignTarget(astArgs[0], line, scope);
+        }
+        return line;
+      }
+    });
+
+    // fgets
+    this.functions.set('fgets', {
+      type: 'BuiltinFunction',
+      name: 'fgets',
+      call: (args: any[], scope: Map<string, any>, astArgs: ASTNode[]) => {
+        if (this.ctx.inputIndex >= this.ctx.inputBuffer.length) return null;
+        const maxLen = Number(args[1]) || 1024;
+        let line = '';
+        while (this.ctx.inputIndex < this.ctx.inputBuffer.length && line.length < maxLen - 1) {
+          const ch = this.ctx.inputBuffer[this.ctx.inputIndex++];
+          line += ch;
+          if (ch === '\n') break;
+        }
+        if (astArgs && astArgs[0]) {
+          this.assignTarget(astArgs[0], line, scope);
+        }
+        return line;
       }
     });
 
@@ -1028,10 +1133,18 @@ export class Interpreter {
       sin: Math.sin,
       cos: Math.cos,
       tan: Math.tan,
+      asin: Math.asin,
+      acos: Math.acos,
+      atan: Math.atan,
+      atan2: Math.atan2,
       log: Math.log,
       log10: Math.log10,
       exp: Math.exp,
       round: Math.round,
+      min: (a: number, b: number) => Math.min(a, b),
+      max: (a: number, b: number) => Math.max(a, b),
+      fmin: (a: number, b: number) => Math.min(a, b),
+      fmax: (a: number, b: number) => Math.max(a, b),
     };
 
     for (const [name, fn] of Object.entries(mathFuncs)) {
@@ -1041,6 +1154,82 @@ export class Interpreter {
         call: (args: any[]) => fn(...args)
       });
     }
+
+    // ctype.h functions
+    this.functions.set('isalpha', {
+      type: 'BuiltinFunction',
+      name: 'isalpha',
+      call: (args: any[]) => {
+        const ch = typeof args[0] === 'number' ? String.fromCharCode(args[0]) : String(args[0])[0];
+        return /^[a-zA-Z]$/.test(ch) ? 1 : 0;
+      }
+    });
+
+    this.functions.set('isdigit', {
+      type: 'BuiltinFunction',
+      name: 'isdigit',
+      call: (args: any[]) => {
+        const ch = typeof args[0] === 'number' ? String.fromCharCode(args[0]) : String(args[0])[0];
+        return /^[0-9]$/.test(ch) ? 1 : 0;
+      }
+    });
+
+    this.functions.set('isalnum', {
+      type: 'BuiltinFunction',
+      name: 'isalnum',
+      call: (args: any[]) => {
+        const ch = typeof args[0] === 'number' ? String.fromCharCode(args[0]) : String(args[0])[0];
+        return /^[a-zA-Z0-9]$/.test(ch) ? 1 : 0;
+      }
+    });
+
+    this.functions.set('isspace', {
+      type: 'BuiltinFunction',
+      name: 'isspace',
+      call: (args: any[]) => {
+        const ch = typeof args[0] === 'number' ? String.fromCharCode(args[0]) : String(args[0])[0];
+        return /\s/.test(ch) ? 1 : 0;
+      }
+    });
+
+    this.functions.set('tolower', {
+      type: 'BuiltinFunction',
+      name: 'tolower',
+      call: (args: any[]) => {
+        const code = Number(args[0]);
+        const ch = String.fromCharCode(code).toLowerCase();
+        return ch.charCodeAt(0);
+      }
+    });
+
+    this.functions.set('toupper', {
+      type: 'BuiltinFunction',
+      name: 'toupper',
+      call: (args: any[]) => {
+        const code = Number(args[0]);
+        const ch = String.fromCharCode(code).toUpperCase();
+        return ch.charCodeAt(0);
+      }
+    });
+
+    // stdlib.h conversion functions
+    this.functions.set('atoi', {
+      type: 'BuiltinFunction',
+      name: 'atoi',
+      call: (args: any[]) => parseInt(String(args[0] || '0'), 10) || 0
+    });
+
+    this.functions.set('atof', {
+      type: 'BuiltinFunction',
+      name: 'atof',
+      call: (args: any[]) => parseFloat(String(args[0] || '0')) || 0
+    });
+
+    this.functions.set('atol', {
+      type: 'BuiltinFunction',
+      name: 'atol',
+      call: (args: any[]) => parseInt(String(args[0] || '0'), 10) || 0
+    });
 
     // string.h standard functions
     this.functions.set('strlen', {
@@ -1058,23 +1247,88 @@ export class Interpreter {
         return s1.localeCompare(s2);
       }
     });
+
+    this.functions.set('strncmp', {
+      type: 'BuiltinFunction',
+      name: 'strncmp',
+      call: (args: any[]) => {
+        const s1 = String(args[0] || '').slice(0, Number(args[2]));
+        const s2 = String(args[1] || '').slice(0, Number(args[2]));
+        return s1.localeCompare(s2);
+      }
+    });
+
+    this.functions.set('strcpy', {
+      type: 'BuiltinFunction',
+      name: 'strcpy',
+      call: (args: any[], scope: Map<string, any>, astArgs: ASTNode[]) => {
+        const src = String(args[1] || '');
+        if (astArgs && astArgs[0]) {
+          this.assignTarget(astArgs[0], src, scope);
+        }
+        return src;
+      }
+    });
+
+    this.functions.set('strcat', {
+      type: 'BuiltinFunction',
+      name: 'strcat',
+      call: (args: any[], scope: Map<string, any>, astArgs: ASTNode[]) => {
+        const dest = String(args[0] || '');
+        const src = String(args[1] || '');
+        const combined = dest + src;
+        if (astArgs && astArgs[0]) {
+          this.assignTarget(astArgs[0], combined, scope);
+        }
+        return combined;
+      }
+    });
+  }
+
+  private createNDArray(sizes: (ASTNode | null)[], scope: Map<string, any>, depth: number = 0): any[] {
+    const sizeExpr = sizes[depth];
+    const evaluatedSize = sizeExpr ? Number(this.evaluateExpression(sizeExpr, scope)) : 100;
+    const currentSize = Math.max(1, !isNaN(evaluatedSize) && evaluatedSize > 0 ? Math.trunc(evaluatedSize) : 100);
+
+    if (depth === sizes.length - 1) {
+      return new Array(currentSize).fill(0);
+    }
+
+    return Array.from({ length: currentSize }, () => this.createNDArray(sizes, scope, depth + 1));
+  }
+
+  private fillNDArray(arr: any[], initNode: ASTNode, scope: Map<string, any>): void {
+    if (!initNode || initNode.type !== 'ArrayInitializer') return;
+    for (let i = 0; i < initNode.elements.length; i++) {
+      const elem = initNode.elements[i];
+      if (elem.type === 'ArrayInitializer') {
+        if (Array.isArray(arr[i])) {
+          this.fillNDArray(arr[i], elem, scope);
+        }
+      } else {
+        arr[i] = this.evaluateExpression(elem, scope);
+      }
+    }
   }
 
   private assignTarget(astNode: ASTNode, value: any, scope: Map<string, any>): void {
-    // Handling &variable or variable (if pointer/array)
     let target = astNode;
     if (target.type === 'UnaryExpression' && target.operator === '&') {
       target = target.argument;
     }
 
     if (target.type === 'Identifier') {
-      scope.set(target.name, value);
+      if (scope.has(target.name)) {
+        scope.set(target.name, value);
+      } else {
+        this.globalScope.set(target.name, value);
+      }
     } else if (target.type === 'MemberExpression') {
       const obj = this.evaluateExpression(target.object, scope);
       const prop = target.computed
         ? this.evaluateExpression(target.property, scope)
         : target.property.name;
-      if (Array.isArray(obj) || typeof obj === 'object') {
+      if (obj !== null && obj !== undefined && (typeof obj === 'object' || Array.isArray(obj))) {
         obj[prop] = value;
       }
     }
@@ -1160,12 +1414,9 @@ export class Interpreter {
       case 'VariableDeclaration': {
         let val: any = 0;
         if (stmt.arraySizes && stmt.arraySizes.length > 0) {
-          const size = stmt.arraySizes[0] ? this.evaluateExpression(stmt.arraySizes[0], scope) : 100;
-          val = new Array(Math.max(1, Number(size) || 100)).fill(0);
+          val = this.createNDArray(stmt.arraySizes, scope, 0);
           if (stmt.initialValue && stmt.initialValue.type === 'ArrayInitializer') {
-            for (let i = 0; i < stmt.initialValue.elements.length; i++) {
-              val[i] = this.evaluateExpression(stmt.initialValue.elements[i], scope);
-            }
+            this.fillNDArray(val, stmt.initialValue, scope);
           }
         } else if (stmt.initialValue) {
           val = this.evaluateExpression(stmt.initialValue, scope);
