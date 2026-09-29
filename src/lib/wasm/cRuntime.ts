@@ -850,6 +850,22 @@ export class Interpreter {
       maxExecutionSteps: 5_000_000,
       stepCount: 0,
     };
+
+    // Standard C streams & global constants
+    this.globalScope.set('stdin', 'stdin');
+    this.globalScope.set('stdout', 'stdout');
+    this.globalScope.set('stderr', 'stderr');
+    this.globalScope.set('NULL', null);
+    this.globalScope.set('null', null);
+    this.globalScope.set('EOF', -1);
+    this.globalScope.set('true', 1);
+    this.globalScope.set('false', 0);
+    this.globalScope.set('RAND_MAX', 32767);
+    this.globalScope.set('INT_MAX', 2147483647);
+    this.globalScope.set('INT_MIN', -2147483648);
+    this.globalScope.set('CHAR_MAX', 127);
+    this.globalScope.set('CHAR_MIN', -128);
+
     this.registerStandardLibraries();
   }
 
@@ -861,6 +877,21 @@ export class Interpreter {
     this.ctx.stdout += str;
   }
 
+  public toCString(val: any): string {
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'string') return val;
+    if (Array.isArray(val)) {
+      let str = '';
+      for (let i = 0; i < val.length; i++) {
+        const ch = val[i];
+        if (ch === 0 || ch === null || ch === undefined) break;
+        str += typeof ch === 'number' ? String.fromCharCode(ch) : String(ch)[0];
+      }
+      return str;
+    }
+    return String(val);
+  }
+
   private registerStandardLibraries(): void {
     // printf
     this.functions.set('printf', {
@@ -868,7 +899,7 @@ export class Interpreter {
       name: 'printf',
       call: (args: any[], scope: Map<string, any>) => {
         if (args.length === 0) return 0;
-        const formatStr = String(args[0]);
+        const formatStr = this.toCString(args[0]);
         let argIdx = 1;
         let formatted = '';
 
@@ -901,9 +932,9 @@ export class Interpreter {
               } else if (typeChar === 'c') {
                 formatted += typeof rawVal === 'number' ? String.fromCharCode(rawVal) : String(rawVal)[0];
               } else if (typeChar === 's') {
-                formatted += String(rawVal);
+                formatted += this.toCString(rawVal);
               } else {
-                formatted += String(rawVal);
+                formatted += this.toCString(rawVal);
               }
             }
           } else {
@@ -915,13 +946,50 @@ export class Interpreter {
       }
     });
 
+    // sprintf
+    this.functions.set('sprintf', {
+      type: 'BuiltinFunction',
+      name: 'sprintf',
+      call: (args: any[], scope: Map<string, any>, astArgs: ASTNode[]) => {
+        if (args.length < 2) return 0;
+        const formatStr = this.toCString(args[1]);
+        let argIdx = 2;
+        let formatted = '';
+
+        for (let i = 0; i < formatStr.length; i++) {
+          if (formatStr[i] === '%' && i + 1 < formatStr.length) {
+            i++;
+            while (i < formatStr.length && !'diufFeEgGxXoscpa%'.includes(formatStr[i])) {
+              i++;
+            }
+            const typeChar = formatStr[i];
+            if (typeChar === '%') {
+              formatted += '%';
+            } else if (argIdx < args.length) {
+              const rawVal = args[argIdx++];
+              if (typeChar === 'd' || typeChar === 'i' || typeChar === 'ld') formatted += Math.trunc(Number(rawVal));
+              else if (typeChar === 'f' || typeChar === 'lf') formatted += Number(rawVal).toFixed(6);
+              else if (typeChar === 'c') formatted += typeof rawVal === 'number' ? String.fromCharCode(rawVal) : String(rawVal)[0];
+              else formatted += this.toCString(rawVal);
+            }
+          } else {
+            formatted += formatStr[i];
+          }
+        }
+        if (astArgs && astArgs[0]) {
+          this.assignTarget(astArgs[0], formatted, scope);
+        }
+        return formatted.length;
+      }
+    });
+
     // scanf
     this.functions.set('scanf', {
       type: 'BuiltinFunction',
       name: 'scanf',
       call: (args: any[], scope: Map<string, any>, astArgs: ASTNode[]) => {
         if (args.length === 0) return 0;
-        const formatStr = String(args[0]);
+        const formatStr = this.toCString(args[0]);
         let matchedCount = 0;
         let argIdx = 1;
         let fmtIdx = 0;
@@ -950,6 +1018,35 @@ export class Interpreter {
               }
               fmtIdx++;
               continue;
+            }
+
+            // Check for scanset format %[^\n] or %[0-9]
+            if (formatStr[fmtIdx] === '[') {
+              const closeBracketIdx = formatStr.indexOf(']', fmtIdx);
+              if (closeBracketIdx !== -1) {
+                const scanset = formatStr.slice(fmtIdx + 1, closeBracketIdx);
+                fmtIdx = closeBracketIdx + 1;
+                if (formatStr[fmtIdx] === 's') fmtIdx++;
+
+                if (argIdx < astArgs.length) {
+                  const targetAst = astArgs[argIdx++];
+                  let matchStr = '';
+                  if (scanset.startsWith('^')) {
+                    const negated = scanset.slice(1).replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+                    while (this.ctx.inputIndex < this.ctx.inputBuffer.length && !negated.includes(this.ctx.inputBuffer[this.ctx.inputIndex])) {
+                      matchStr += this.ctx.inputBuffer[this.ctx.inputIndex++];
+                    }
+                  } else {
+                    const allowed = scanset.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+                    while (this.ctx.inputIndex < this.ctx.inputBuffer.length && allowed.includes(this.ctx.inputBuffer[this.ctx.inputIndex])) {
+                      matchStr += this.ctx.inputBuffer[this.ctx.inputIndex++];
+                    }
+                  }
+                  this.assignTarget(targetAst, matchStr, scope);
+                  matchedCount++;
+                }
+                continue;
+              }
             }
 
             // Parse specifiers (e.g. %d, %i, %ld, %lld, %f, %lf, %s, %c, %x, %o)
@@ -1055,7 +1152,7 @@ export class Interpreter {
       type: 'BuiltinFunction',
       name: 'puts',
       call: (args: any[]) => {
-        const str = args[0] !== undefined ? String(args[0]) : '';
+        const str = this.toCString(args[0]);
         this.appendStdout(str + '\n');
         return 0;
       }
@@ -1081,7 +1178,7 @@ export class Interpreter {
       }
     });
 
-    // fgets
+    // fgets(str, size, stream)
     this.functions.set('fgets', {
       type: 'BuiltinFunction',
       name: 'fgets',
@@ -1099,6 +1196,52 @@ export class Interpreter {
         }
         return line;
       }
+    });
+
+    // fgetc(stream)
+    this.functions.set('fgetc', {
+      type: 'BuiltinFunction',
+      name: 'fgetc',
+      call: () => {
+        if (this.ctx.inputIndex >= this.ctx.inputBuffer.length) return -1;
+        return this.ctx.inputBuffer.charCodeAt(this.ctx.inputIndex++);
+      }
+    });
+
+    // fputc(c, stream)
+    this.functions.set('fputc', {
+      type: 'BuiltinFunction',
+      name: 'fputc',
+      call: (args: any[]) => {
+        const charCode = Number(args[0]);
+        this.appendStdout(String.fromCharCode(charCode));
+        return charCode;
+      }
+    });
+
+    // fputs(str, stream)
+    this.functions.set('fputs', {
+      type: 'BuiltinFunction',
+      name: 'fputs',
+      call: (args: any[]) => {
+        const str = this.toCString(args[0]);
+        this.appendStdout(str);
+        return 0;
+      }
+    });
+
+    // fflush(stream)
+    this.functions.set('fflush', {
+      type: 'BuiltinFunction',
+      name: 'fflush',
+      call: () => 0
+    });
+
+    // feof(stream)
+    this.functions.set('feof', {
+      type: 'BuiltinFunction',
+      name: 'feof',
+      call: () => this.ctx.inputIndex >= this.ctx.inputBuffer.length ? 1 : 0
     });
 
     // putchar / getchar
@@ -1544,12 +1687,25 @@ export class Interpreter {
             ? this.evaluateExpression(expr.left.property, scope)
             : expr.left.property.name;
           let finalVal = rightVal;
-          if (expr.operator === '+=') finalVal = obj[prop] + rightVal;
-          else if (expr.operator === '-=') finalVal = obj[prop] - rightVal;
-          else if (expr.operator === '*=') finalVal = obj[prop] * rightVal;
-          else if (expr.operator === '/=') finalVal = Math.trunc(obj[prop] / rightVal);
-          else if (expr.operator === '%=') finalVal = obj[prop] % rightVal;
-          obj[prop] = finalVal;
+          if (expr.operator === '+=') finalVal = (obj[prop] !== undefined ? obj[prop] : 0) + rightVal;
+          else if (expr.operator === '-=') finalVal = (obj[prop] !== undefined ? obj[prop] : 0) - rightVal;
+          else if (expr.operator === '*=') finalVal = (obj[prop] !== undefined ? obj[prop] : 0) * rightVal;
+          else if (expr.operator === '/=') finalVal = Math.trunc((obj[prop] !== undefined ? obj[prop] : 0) / rightVal);
+          else if (expr.operator === '%=') finalVal = (obj[prop] !== undefined ? obj[prop] : 0) % rightVal;
+
+          if (typeof obj === 'string' && expr.left.object.type === 'Identifier') {
+            const varName = expr.left.object.name;
+            const chars = obj.split('');
+            const idx = Number(prop);
+            const charStr = typeof finalVal === 'number' ? String.fromCharCode(finalVal) : String(finalVal)[0];
+            chars[idx] = charStr;
+            const newStr = chars.join('');
+            if (scope.has(varName)) scope.set(varName, newStr);
+            else this.globalScope.set(varName, newStr);
+            return finalVal;
+          } else if (obj !== null && obj !== undefined && (typeof obj === 'object' || Array.isArray(obj))) {
+            obj[prop] = finalVal;
+          }
           return finalVal;
         }
         throw new RuntimeError("Invalid lvalue in assignment");
@@ -1626,6 +1782,13 @@ export class Interpreter {
         if (obj === undefined || obj === null) {
           throw new RuntimeError("Cannot read property of null or undefined array/object");
         }
+        if (typeof obj === 'string') {
+          const idx = Number(prop);
+          if (idx >= 0 && idx < obj.length) {
+            return obj.charCodeAt(idx);
+          }
+          return 0; // null terminator '\0'
+        }
         return obj[prop] !== undefined ? obj[prop] : 0;
       }
 
@@ -1651,8 +1814,15 @@ export class Interpreter {
       }
 
       case 'SizeofExprExpression': {
+        if (expr.argument.type === 'Identifier') {
+          const varName = expr.argument.name;
+          const val = scope.has(varName) ? scope.get(varName) : this.globalScope.get(varName);
+          if (Array.isArray(val)) return val.length * 4;
+          if (typeof val === 'string') return Math.max(val.length + 1, 1024);
+        }
         const val = this.evaluateExpression(expr.argument, scope);
         if (Array.isArray(val)) return val.length * 4;
+        if (typeof val === 'string') return Math.max(val.length + 1, 1024);
         return 4;
       }
 
