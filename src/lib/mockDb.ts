@@ -264,7 +264,33 @@ class DatabaseService {
     this.syncFromSupabase();
   }
 
-  public async syncFromSupabase(): Promise<void> {
+  private lastFullSyncTime = 0;
+  private syncPromise: Promise<void> | null = null;
+  private lastMonitoringSyncTime = 0;
+  private lastResultsSyncTime: Record<string, number> = {};
+
+  public async syncFromSupabase(force = false): Promise<void> {
+    if (!isSupabaseConfigured || !supabase) return;
+    const now = Date.now();
+    // Throttle full syncs to at most once per 30 seconds unless explicitly forced
+    if (!force && now - this.lastFullSyncTime < 30000) {
+      return;
+    }
+    // Deduplicate in-flight sync requests
+    if (this.syncPromise) {
+      return this.syncPromise;
+    }
+
+    this.syncPromise = this.doFullSync();
+    try {
+      await this.syncPromise;
+    } finally {
+      this.syncPromise = null;
+      this.lastFullSyncTime = Date.now();
+    }
+  }
+
+  private async doFullSync(): Promise<void> {
     if (!isSupabaseConfigured || !supabase) return;
     try {
       // 1. Fetch tests, questions, and test_cases directly
@@ -345,18 +371,20 @@ class DatabaseService {
         localStorage.setItem(this.attemptsKey, JSON.stringify(attemptsData));
       }
 
+      // Constrain submissions query to recent records to save bandwidth and logs
       const { data: subsData, error: subsError } = await supabase
         .from('submissions')
         .select(`
           *,
           resultsRecord:submission_results (*)
-        `);
+        `)
+        .order('submitted_at', { ascending: false })
+        .limit(200);
 
       if (!subsError && subsData && subsData.length > 0) {
         const normalizedSubs: Submission[] = subsData.map((s: any) => {
           let testCaseResults: any[] = [];
           if (s.resultsRecord) {
-            // If submission_results returns as an object with `results` array or array of records
             if (Array.isArray(s.resultsRecord)) {
               if (s.resultsRecord.length > 0 && s.resultsRecord[0].results) {
                 testCaseResults = s.resultsRecord[0].results;
@@ -376,15 +404,29 @@ class DatabaseService {
           };
         });
 
-        localStorage.setItem(this.submissionsKey, JSON.stringify(normalizedSubs));
+        // Merge with existing local submissions so older local data is preserved
+        const existingSubs = this.getSubmissions();
+        const subMap = new Map<string, Submission>(existingSubs.map(s => [s.id, s]));
+        for (const s of normalizedSubs) {
+          subMap.set(s.id, s);
+        }
+        localStorage.setItem(this.submissionsKey, JSON.stringify(Array.from(subMap.values())));
       }
 
+      // Constrain test events to recent records
       const { data: eventsData, error: eventsError } = await supabase
         .from('test_events')
-        .select('*');
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
 
       if (!eventsError && eventsData && eventsData.length > 0) {
-        localStorage.setItem(this.eventsKey, JSON.stringify(eventsData));
+        const existingEvents = this.getEvents();
+        const eventMap = new Map<string, TestEvent>(existingEvents.map(e => [e.id, e]));
+        for (const e of eventsData) {
+          eventMap.set(e.id, e);
+        }
+        localStorage.setItem(this.eventsKey, JSON.stringify(Array.from(eventMap.values())));
       }
 
       const { data: helpData, error: helpError } = await supabase
@@ -396,6 +438,128 @@ class DatabaseService {
       }
     } catch (err) {
       console.warn('Supabase sync warning:', err);
+    }
+  }
+
+  /**
+   * Lightweight targeted sync for live teacher monitoring.
+   * Only fetches test_attempts and help_requests for the target test instead of scanning the whole DB.
+   */
+  public async syncLiveMonitoring(testId?: string): Promise<void> {
+    if (!isSupabaseConfigured || !supabase) return;
+    const now = Date.now();
+    if (now - this.lastMonitoringSyncTime < 4000) return;
+    this.lastMonitoringSyncTime = now;
+
+    try {
+      // 1. Fetch test_attempts
+      let attQuery = supabase.from('test_attempts').select('*');
+      if (testId) attQuery = attQuery.eq('test_id', testId);
+      const { data: attemptsData } = await attQuery;
+
+      if (attemptsData) {
+        const existing = this.getAttempts();
+        const map = new Map<string, TestAttempt>(existing.map(a => [a.id, a]));
+        for (const a of attemptsData) {
+          map.set(a.id, a);
+        }
+        localStorage.setItem(this.attemptsKey, JSON.stringify(Array.from(map.values())));
+      }
+
+      // 2. Fetch help_requests
+      let helpQuery = supabase.from('help_requests').select('*');
+      if (testId) helpQuery = helpQuery.eq('test_id', testId);
+      const { data: helpData } = await helpQuery;
+
+      if (helpData) {
+        const existingHelp = this.getHelpRequests();
+        const helpMap = new Map<string, HelpRequest>(existingHelp.map(h => [h.id, h]));
+        for (const h of helpData) {
+          helpMap.set(h.id, h);
+        }
+        localStorage.setItem(this.helpRequestsKey, JSON.stringify(Array.from(helpMap.values())));
+      }
+    } catch (err) {
+      console.warn('syncLiveMonitoring error:', err);
+    }
+  }
+
+  /**
+   * Targeted sync for Results page: only fetches attempts & submissions for the specified test.
+   */
+  public async syncTestResults(testId: string): Promise<void> {
+    if (!isSupabaseConfigured || !supabase || !testId) return;
+    const now = Date.now();
+    if (now - (this.lastResultsSyncTime[testId] || 0) < 8000) return;
+    this.lastResultsSyncTime[testId] = now;
+
+    try {
+      const { data: attemptsData } = await supabase
+        .from('test_attempts')
+        .select('*')
+        .eq('test_id', testId);
+
+      if (attemptsData && attemptsData.length > 0) {
+        const existing = this.getAttempts();
+        const map = new Map<string, TestAttempt>(existing.map(a => [a.id, a]));
+        for (const a of attemptsData) {
+          map.set(a.id, a);
+        }
+        localStorage.setItem(this.attemptsKey, JSON.stringify(Array.from(map.values())));
+
+        const attemptIds = attemptsData.map(a => a.id);
+        const { data: subsData } = await supabase
+          .from('submissions')
+          .select(`*, resultsRecord:submission_results (*)`)
+          .in('attempt_id', attemptIds);
+
+        if (subsData) {
+          const normalized = subsData.map((s: any) => {
+            let testCaseResults: any[] = [];
+            if (s.resultsRecord) {
+              if (Array.isArray(s.resultsRecord)) {
+                testCaseResults = s.resultsRecord.length > 0 && s.resultsRecord[0].results ? s.resultsRecord[0].results : s.resultsRecord;
+              } else if (s.resultsRecord.results) {
+                testCaseResults = s.resultsRecord.results;
+              }
+            } else if (s.results) {
+              testCaseResults = Array.isArray(s.results) ? s.results : [];
+            }
+            return { ...s, results: testCaseResults };
+          });
+
+          const existingSubs = this.getSubmissions();
+          const subMap = new Map<string, Submission>(existingSubs.map(s => [s.id, s]));
+          for (const s of normalized) {
+            subMap.set(s.id, s);
+          }
+          localStorage.setItem(this.submissionsKey, JSON.stringify(Array.from(subMap.values())));
+        }
+      }
+    } catch (err) {
+      console.warn('syncTestResults error:', err);
+    }
+  }
+
+  /**
+   * Targeted sync for a single student help request.
+   */
+  public async syncStudentHelpRequest(attemptId: string): Promise<void> {
+    if (!isSupabaseConfigured || !supabase || !attemptId) return;
+    try {
+      const { data } = await supabase
+        .from('help_requests')
+        .select('*')
+        .eq('attempt_id', attemptId);
+
+      if (data) {
+        const existing = this.getHelpRequests().filter(h => h.attempt_id !== attemptId);
+        const combined = [...data, ...existing];
+        localStorage.setItem(this.helpRequestsKey, JSON.stringify(combined));
+        this.notifyHelpUpdate('update');
+      }
+    } catch (err) {
+      console.warn('syncStudentHelpRequest error:', err);
     }
   }
 

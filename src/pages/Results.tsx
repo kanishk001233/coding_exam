@@ -24,22 +24,33 @@ export const Results: React.FC<ResultsProps> = ({
   const questions = test.questions || [];
   const maxPossibleMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
 
-  // Real-time polling for teacher dashboard results (relaxed interval)
+  // Real-time polling for teacher dashboard results (relaxed interval, only when active)
   React.useEffect(() => {
     let isRefreshing = false;
     const refresh = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
       if (isRefreshing) return;
       isRefreshing = true;
       try {
-        await mockDb.syncFromSupabase();
+        await mockDb.syncTestResults(test.id);
         setAllAttempts(mockDb.getAttempts(test.id));
       } finally {
         isRefreshing = false;
       }
     };
     refresh();
-    const interval = setInterval(refresh, 6000);
-    return () => clearInterval(interval);
+    const interval = setInterval(refresh, 25000);
+    const handleVis = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', handleVis);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVis);
+    };
   }, [test.id]);
 
   const studentSubmissions = attempt ? mockDb.getLatestSubmissions(attempt.id) : [];

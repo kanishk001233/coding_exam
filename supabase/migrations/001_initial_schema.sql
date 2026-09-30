@@ -164,6 +164,10 @@ CREATE TABLE IF NOT EXISTS help_requests (
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'resolved'))
 );
 
+CREATE INDEX IF NOT EXISTS idx_help_requests_test_id ON help_requests (test_id);
+CREATE INDEX IF NOT EXISTS idx_help_requests_attempt_id ON help_requests (attempt_id);
+CREATE INDEX IF NOT EXISTS idx_help_requests_status ON help_requests (status);
+
 -- Enable Row Level Security (RLS)
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tests ENABLE ROW LEVEL SECURITY;

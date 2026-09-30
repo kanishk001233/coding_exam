@@ -41,22 +41,35 @@ export const Login: React.FC = () => {
 
     try {
       if (isSupabaseConfigured && supabase) {
-        const { error: authError } = await supabase.auth.signInWithPassword({
-          email: trimmedEmail,
-          password: enteredPassword,
-        });
-
-        if (authError) {
-          await supabase.auth.signUp({
+        try {
+          const { error: authError } = await supabase.auth.signInWithPassword({
             email: trimmedEmail,
             password: enteredPassword,
-            options: {
-              data: {
-                name: 'Instructor',
-                role: 'teacher',
-              },
-            },
           });
+
+          // Only attempt signUp if the user literally does NOT exist in Supabase Auth yet.
+          // NEVER call signUp if the email is already registered or awaiting confirmation.
+          if (authError) {
+            const msg = (authError.message || '').toLowerCase();
+            const isEmailUnconfirmed = msg.includes('email not confirmed') || msg.includes('unconfirmed');
+            const isUserMissing = msg.includes('invalid login credentials') || msg.includes('user not found');
+
+            if (!isEmailUnconfirmed && isUserMissing) {
+              await supabase.auth.signUp({
+                email: trimmedEmail,
+                password: enteredPassword,
+                options: {
+                  data: {
+                    name: 'Instructor',
+                    role: 'teacher',
+                  },
+                },
+              });
+            }
+          }
+        } catch (authErr) {
+          // Log auth warning without blocking authorized teacher login
+          console.warn('Supabase auth warning:', authErr);
         }
       }
 

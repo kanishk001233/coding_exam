@@ -91,7 +91,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   };
 
   const fetchLiveAttempts = async () => {
-    await mockDb.syncFromSupabase();
+    if (selectedTestId) {
+      await mockDb.syncLiveMonitoring(selectedTestId);
+    } else {
+      await mockDb.syncFromSupabase();
+    }
     const updatedTests = mockDb.getTests();
     setTests(updatedTests);
     const activeId = selectedTestId || updatedTests[0]?.id;
@@ -103,7 +107,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
-    await fetchLiveAttempts();
+    await mockDb.syncFromSupabase(true);
+    const updatedTests = mockDb.getTests();
+    setTests(updatedTests);
+    const activeId = selectedTestId || updatedTests[0]?.id;
+    if (activeId) {
+      setAttempts(mockDb.getAttempts(activeId));
+    }
+    fetchHelpRequests();
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
@@ -211,7 +222,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               if (payload.eventType === 'INSERT' && payload.new?.status === 'pending') {
                 playTingNotification();
               }
-              await mockDb.syncFromSupabase();
+              await mockDb.syncLiveMonitoring(selectedTestId);
               fetchHelpRequests({ playSoundIfNew: payload.eventType === 'INSERT' });
             }
           )
@@ -219,7 +230,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             'postgres_changes',
             { event: '*', schema: 'public', table: 'test_attempts' },
             async () => {
-              await mockDb.syncFromSupabase();
+              await mockDb.syncLiveMonitoring(selectedTestId);
               const refreshed = mockDb.getTests();
               setTests(refreshed);
               if (selectedTestId) {
@@ -233,9 +244,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       }
     }
 
-    // 3. Relaxed fallback interval polling (6s) to avoid overloading Supabase Realtime
+    // 3. Fallback interval polling - only runs when tab is active and visible (25s)
     let isSyncing = false;
     const interval = setInterval(async () => {
+      // Don't waste Supabase quota when the browser tab is hidden or minimized!
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
       if (isSyncing) return;
       isSyncing = true;
       try {
@@ -243,10 +258,18 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       } finally {
         isSyncing = false;
       }
-    }, 6000);
+    }, 25000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLiveAttempts();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('codearena_help_update', handleInstantHelpUpdate);
       if (bc) bc.close();
       if (supabaseChannel && supabase) {

@@ -231,7 +231,7 @@ export const StudentTest: React.FC<StudentTestProps> = ({
             'postgres_changes',
             { event: '*', schema: 'public', table: 'help_requests', filter: `attempt_id=eq.${attempt.id}` },
             async () => {
-              await mockDb.syncFromSupabase();
+              await mockDb.syncStudentHelpRequest(attempt.id);
               checkHelpStatus();
             }
           )
