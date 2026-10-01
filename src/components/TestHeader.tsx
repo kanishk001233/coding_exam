@@ -1,7 +1,7 @@
 import React from 'react';
 import { Test } from '../types/database';
 import { TestTimer } from './TestTimer';
-import { Maximize2, ShieldAlert, CheckCircle2, Sparkles, LogOut, Terminal, Layers } from 'lucide-react';
+import { Maximize2, ShieldAlert, CheckCircle2, Sparkles, LogOut, Terminal, Layers, Clock } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 interface TestHeaderProps {
@@ -55,7 +55,7 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
               <span>{totalQuestions} {totalQuestions === 1 ? 'Problem' : 'Problems'}</span>
             </span>
             <span className="text-slate-300 dark:text-zinc-700">•</span>
-            <span>{test.duration_minutes} mins</span>
+            <span>{test.is_untimed ? 'Untimed Assessment' : `${test.duration_minutes} mins`}</span>
           </div>
         </div>
       </div>
@@ -119,12 +119,27 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
 
-        {/* Test Timer */}
-        <TestTimer
-          durationMinutes={test.duration_minutes}
-          startedAt={startedAt}
-          onExpire={onExpireTimer}
-        />
+        {/* Test Timer or Untimed Badge */}
+        {test.is_untimed ? (
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono select-none shadow-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
+            title="Untimed Assessment: No countdown timer. You can resume at any point."
+          >
+            <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex flex-col">
+              <span className="text-[9px] uppercase tracking-wider text-emerald-600/70 dark:text-emerald-400/70 font-sans font-semibold leading-none">
+                Mode
+              </span>
+              <span className="text-xs font-bold leading-tight">Untimed</span>
+            </div>
+          </div>
+        ) : (
+          <TestTimer
+            durationMinutes={test.duration_minutes}
+            startedAt={startedAt}
+            onExpire={onExpireTimer}
+          />
+        )}
 
         {/* End Test Button */}
         <button

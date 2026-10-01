@@ -175,17 +175,17 @@ export const AiAssistModal: React.FC<AiAssistModalProps> = ({
                 <div className="text-center py-4 sm:py-6 space-y-5">
                   <div className="space-y-2">
                     <h4 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                      Need guidance on this problem?
+                      Need help with this problem?
                     </h4>
                     <p className="text-sm text-slate-600 dark:text-zinc-300 max-w-md mx-auto leading-relaxed">
-                      The AI Coach will inspect your current code and give you <strong>one conceptual step at a time</strong> without giving away the raw code.
+                      The AI guide will check what you have written so far and give you <strong>easy step-by-step hints</strong> without giving away the direct code answer.
                     </p>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-500/30 text-left text-xs sm:text-sm text-violet-950 dark:text-violet-200 flex items-center gap-3">
                     <span className="text-xl shrink-0">💡</span>
                     <span className="leading-relaxed">
-                      Guidance is generated <strong>once per problem</strong>. You can progress through steps sequentially as you solve the problem.
+                      Hints are made <strong>once per problem</strong>. You can view each step one by one as you work on your solution.
                     </span>
                   </div>
 

@@ -623,7 +623,7 @@ class DatabaseService {
 
     if (isSupabaseConfigured && supabase) {
       try {
-        const { error: testErr } = await supabase.from('tests').upsert({
+        const testPayload: Record<string, any> = {
           id: test.id,
           title: test.title,
           description: test.description,
@@ -634,7 +634,17 @@ class DatabaseService {
           created_at: test.created_at,
           enable_tab_switch_tracking: test.enable_tab_switch_tracking !== false,
           enable_fullscreen_mode: test.enable_fullscreen_mode !== false,
-        });
+          is_untimed: Boolean(test.is_untimed),
+        };
+
+        let { error: testErr } = await supabase.from('tests').upsert(testPayload);
+
+        // Defensive fallback: If Supabase migration hasn't been executed yet, retry without is_untimed
+        if (testErr && testErr.message && testErr.message.includes('is_untimed')) {
+          delete testPayload.is_untimed;
+          const retryRes = await supabase.from('tests').upsert(testPayload);
+          testErr = retryRes.error;
+        }
 
         if (testErr) {
           console.error('Supabase tests upsert failed:', testErr.message, testErr);
@@ -852,6 +862,7 @@ class DatabaseService {
       total_marks: totalMarks,
       enable_tab_switch_tracking: sourceTest.enable_tab_switch_tracking !== false,
       enable_fullscreen_mode: sourceTest.enable_fullscreen_mode !== false,
+      is_untimed: Boolean(sourceTest.is_untimed),
     };
 
     await this.saveTest(newTest);

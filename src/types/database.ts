@@ -68,6 +68,7 @@ export interface Test {
   total_marks?: number;
   enable_tab_switch_tracking?: boolean;
   enable_fullscreen_mode?: boolean;
+  is_untimed?: boolean;
 }
 
 export interface TestAttempt {

@@ -203,6 +203,8 @@ export const StudentTest: React.FC<StudentTestProps> = ({
 
   // Instant real-time listener for help request resolution
   useEffect(() => {
+    if (test.is_untimed) return;
+
     const checkHelpStatus = () => {
       const isPending = mockDb.isHelpPending(attempt.id);
       setIsHelpRequested(isPending);
@@ -494,35 +496,37 @@ export const StudentTest: React.FC<StudentTestProps> = ({
         onExpireTimer={handleExpireTimer}
       />
 
-      {/* Floating Bottom-Right Hand Raise Button (Direct Large Circular Icon) */}
-      <div className="fixed bottom-5 right-5 z-40 select-none">
-        <button
-          type="button"
-          onClick={handleToggleNeedHelp}
-          className={`relative p-0 rounded-full transition-all duration-200 hover:scale-110 active:scale-90 cursor-pointer focus:outline-none ${
-            isHelpRequested
-              ? 'animate-bounce drop-shadow-[0_10px_20px_rgba(245,158,11,0.5)]'
-              : 'hover:drop-shadow-[0_8px_16px_rgba(0,0,0,0.25)] drop-shadow-[0_4px_10px_rgba(0,0,0,0.15)]'
-          }`}
-          title={
-            isHelpRequested
-              ? 'Teacher notified! Click to cancel help request.'
-              : 'Click to raise your hand and notify instructor for desk assistance.'
-          }
-        >
-          <img
-            src={handRaiseIcon}
-            alt="Raise Hand"
-            className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-full"
-          />
-          {isHelpRequested && (
-            <span className="absolute -top-1 -right-1 flex h-4 w-4">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-500 border-2 border-white"></span>
-            </span>
-          )}
-        </button>
-      </div>
+      {/* Floating Bottom-Right Hand Raise Button (Hidden for Untimed Assessments) */}
+      {!test.is_untimed && (
+        <div className="fixed bottom-5 right-5 z-40 select-none">
+          <button
+            type="button"
+            onClick={handleToggleNeedHelp}
+            className={`relative p-0 rounded-full transition-all duration-200 hover:scale-110 active:scale-90 cursor-pointer focus:outline-none ${
+              isHelpRequested
+                ? 'animate-bounce drop-shadow-[0_10px_20px_rgba(245,158,11,0.5)]'
+                : 'hover:drop-shadow-[0_8px_16px_rgba(0,0,0,0.25)] drop-shadow-[0_4px_10px_rgba(0,0,0,0.15)]'
+            }`}
+            title={
+              isHelpRequested
+                ? 'Teacher notified! Click to cancel help request.'
+                : 'Click to raise your hand and notify instructor for desk assistance.'
+            }
+          >
+            <img
+              src={handRaiseIcon}
+              alt="Raise Hand"
+              className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-full"
+            />
+            {isHelpRequested && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-500 border-2 border-white"></span>
+              </span>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Help Requested Toast Notification */}
       {helpToast && (

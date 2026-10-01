@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Test, Question, TestCase } from '../types/database';
 import { mockDb } from '../lib/mockDb';
-import { ArrowLeft, Check, RefreshCw, Plus, Trash2, Eye, EyeOff, Code2, Upload, FileSpreadsheet, Download, ShieldCheck, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, RefreshCw, Plus, Trash2, Eye, EyeOff, Code2, Upload, FileSpreadsheet, Download, ShieldCheck, Loader2, Clock } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { ModalDialog } from '../components/ModalDialog';
 import { QuestionMediaUpload } from '../components/QuestionMediaUpload';
@@ -18,6 +18,7 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
   const [description, setDescription] = useState('');
   const [joinCode, setJoinCode] = useState(() => 'C' + Math.floor(1000 + Math.random() * 9000));
   const [durationMinutes, setDurationMinutes] = useState(45);
+  const [isUntimed, setIsUntimed] = useState(false);
   const [status, setStatus] = useState<'draft' | 'scheduled' | 'live'>('live');
   const [enableTabSwitchTracking, setEnableTabSwitchTracking] = useState(true);
   const [enableFullscreenMode, setEnableFullscreenMode] = useState(true);
@@ -278,7 +279,7 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
       title: title.trim(),
       description: description.trim(),
       join_code: joinCode.trim().toUpperCase(),
-      duration_minutes: Number(durationMinutes) || 45,
+      duration_minutes: isUntimed ? 0 : (Number(durationMinutes) || 45),
       status,
       created_by: 'teacher-kanishk',
       created_at: new Date().toISOString(),
@@ -286,6 +287,7 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
       total_marks: totalMarks,
       enable_tab_switch_tracking: enableTabSwitchTracking,
       enable_fullscreen_mode: enableFullscreenMode,
+      is_untimed: isUntimed,
     };
 
     setIsSaving(true);
@@ -384,16 +386,53 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Duration (Minutes)</label>
-                <input
-                  type="number"
-                  required
-                  min={5}
-                  max={300}
-                  value={durationMinutes}
-                  onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                />
+                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Assessment Mode</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsUntimed(false)}
+                    className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all text-center cursor-pointer ${
+                      !isUntimed
+                        ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                        : 'bg-slate-50 dark:bg-[#09090b] border-slate-300 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:border-slate-400'
+                    }`}
+                  >
+                    Timed Test
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsUntimed(true)}
+                    className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all text-center cursor-pointer ${
+                      isUntimed
+                        ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                        : 'bg-slate-50 dark:bg-[#09090b] border-slate-300 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:border-slate-400'
+                    }`}
+                  >
+                    Untimed Assessment
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                  {isUntimed ? 'Duration (Assessment Mode)' : 'Duration (Minutes)'}
+                </label>
+                {isUntimed ? (
+                  <div className="w-full px-3 py-2 bg-slate-100 dark:bg-zinc-800/60 border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-600 dark:text-zinc-300 flex items-center justify-between">
+                    <span>No Time Limit (Resumable)</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-bold uppercase">Untimed</span>
+                  </div>
+                ) : (
+                  <input
+                    type="number"
+                    required
+                    min={5}
+                    max={300}
+                    value={durationMinutes}
+                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-300 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -409,6 +448,16 @@ export const CreateTest: React.FC<CreateTestProps> = ({ onSave, onCancel }) => {
                 </select>
               </div>
             </div>
+
+            {isUntimed && (
+              <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 text-xs text-amber-800 dark:text-amber-300 leading-relaxed flex items-start gap-2.5">
+                <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold">Untimed Assessment Mode: </span>
+                  Works like a take-home assessment or assignment. The countdown timer is removed, the floating "Need Help" button is disabled, and Classroom Live Monitor polling is deactivated to drastically minimize database load. Students can safely leave and resume their work at any point until final submission.
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Anti-Cheat & Proctoring Controls Card */}

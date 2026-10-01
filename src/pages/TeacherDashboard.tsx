@@ -251,6 +251,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
         return;
       }
+      // If currently selected test is an untimed assessment, skip polling to preserve quota
+      const currentSelected = mockDb.getTests().find(t => t.id === selectedTestId);
+      if (currentSelected?.is_untimed) {
+        return;
+      }
       if (isSyncing) return;
       isSyncing = true;
       try {
@@ -802,20 +807,27 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                               {test.description || 'No description provided.'}
                             </p>
                           </div>
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                              isLive
-                                ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/40'
-                                : test.status === 'scheduled'
-                                ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30'
-                                : test.status === 'ended'
-                                ? 'bg-slate-100 dark:bg-[#18181b] text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700'
-                                : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30'
-                            }`}
-                          >
-                            {isLive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />}
-                            {test.status}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {test.is_untimed && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-violet-100 dark:bg-violet-950/80 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-500/30">
+                                Untimed
+                              </span>
+                            )}
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                                isLive
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/40'
+                                  : test.status === 'scheduled'
+                                  ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30'
+                                  : test.status === 'ended'
+                                  ? 'bg-slate-100 dark:bg-[#18181b] text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700'
+                                  : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30'
+                              }`}
+                            >
+                              {isLive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />}
+                              {test.status}
+                            </span>
+                          </div>
                         </div>
 
                         {/* Join Code & Assessment Specs Box */}
@@ -847,7 +859,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                           <div className="grid grid-cols-3 gap-2 text-center text-xs py-1 border-t border-b border-slate-200/60 dark:border-zinc-800/60">
                             <div>
                               <span className="block text-[10px] text-slate-400 uppercase font-semibold">Duration</span>
-                              <span className="font-bold text-slate-800 dark:text-zinc-200">{test.duration_minutes}m</span>
+                              <span className="font-bold text-slate-800 dark:text-zinc-200">
+                                {test.is_untimed ? 'Untimed' : `${test.duration_minutes}m`}
+                              </span>
                             </div>
                             <div>
                               <span className="block text-[10px] text-slate-400 uppercase font-semibold">Questions</span>
@@ -1001,6 +1015,20 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     </select>
                   </div>
                 </div>
+
+                {selectedTest?.is_untimed && (
+                  <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 flex items-start gap-3 text-xs">
+                    <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <div className="font-bold text-amber-900 dark:text-amber-200 text-sm">
+                        Untimed Assessment Mode Active
+                      </div>
+                      <p className="text-amber-800 dark:text-amber-300/90 leading-relaxed">
+                        Automatic live monitoring queries and background intervals are paused for this assessment to preserve Supabase quota and database resources. Students can complete and resume this test anytime until final submission. You can click <strong>Manual Sync</strong> or visit <strong>Assessment Results</strong> to see submitted work.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <StudentList
                   test={selectedTest}

@@ -297,7 +297,7 @@ export const JoinTest: React.FC = () => {
                 <div className="flex items-center justify-between text-xs sm:text-sm text-slate-600 dark:text-zinc-400 pt-2 border-t border-indigo-200/60 dark:border-indigo-800/40">
                   <span className="flex items-center gap-1.5 font-semibold">
                     <Clock className="w-4 h-4 text-indigo-500" />
-                    {selectedTest.duration_minutes} Mins
+                    {selectedTest.is_untimed ? 'Untimed Assessment' : `${selectedTest.duration_minutes} Mins`}
                   </span>
                   <span className="flex items-center gap-1.5 font-semibold">
                     <BookOpen className="w-4 h-4 text-emerald-500" />
