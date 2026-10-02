@@ -54,12 +54,21 @@ function StudentResultsWrapper() {
   const test: Test = JSON.parse(testRaw);
   const attempt: TestAttempt = JSON.parse(attemptRaw);
 
+  const handleStudentExit = () => {
+    try {
+      mockDb.clearStorageAfterTest(attempt.id);
+      sessionStorage.removeItem('c_exam_student_attempt');
+      sessionStorage.removeItem('c_exam_active_test');
+    } catch {}
+    navigate('/student');
+  };
+
   return (
     <Results
       test={test}
       attempt={attempt}
       isTeacherView={false}
-      onBackToDashboard={() => navigate('/student')}
+      onBackToDashboard={handleStudentExit}
     />
   );
 }

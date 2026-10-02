@@ -153,7 +153,7 @@ export const Results: React.FC<ResultsProps> = ({
               className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white mb-2 transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Dashboard</span>
+              <span>{isTeacherView ? 'Back to Dashboard' : 'Finish & Exit Assessment'}</span>
             </button>
             <h1 className="text-2xl font-black text-slate-900 dark:text-white">{test.title}</h1>
             <p className="text-xs text-slate-500 dark:text-zinc-400">
@@ -163,6 +163,15 @@ export const Results: React.FC<ResultsProps> = ({
 
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            {!isTeacherView && (
+              <button
+                type="button"
+                onClick={onBackToDashboard}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 transition-all active:scale-95 cursor-pointer"
+              >
+                <span>Exit Assessment</span>
+              </button>
+            )}
             {isTeacherView && (
               <>
                 <button

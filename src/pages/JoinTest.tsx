@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Test, TestAttempt } from '../types/database';
 import { mockDb } from '../lib/mockDb';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { wasmCompiler } from '../lib/wasm/compiler';
 import {
   KeyRound, User, Hash, ArrowRight, Clock, BookOpen, AlertCircle,
@@ -60,6 +61,13 @@ export const JoinTest: React.FC = () => {
     wasmCompiler.initialize().then(() => {
       setIsWasmReady(true);
     });
+
+    // Clear any leftover student attempt and test session on mount
+    try {
+      sessionStorage.removeItem('c_exam_student_attempt');
+      sessionStorage.removeItem('c_exam_active_test');
+      mockDb.clearAllStudentDrafts();
+    } catch {}
   }, []);
 
   const handleTestCodeChange = (code: string) => {
@@ -83,7 +91,9 @@ export const JoinTest: React.FC = () => {
       return;
     }
 
-    if (!studentName.trim() || !rollNo.trim()) {
+    const cleanRoll = rollNo.trim().toUpperCase();
+
+    if (!studentName.trim() || !cleanRoll) {
       setError('Please provide both your Full Name and Student UID.');
       return;
     }
@@ -110,30 +120,87 @@ export const JoinTest: React.FC = () => {
         return;
       }
 
+      // Check for existing attempt with case-insensitive UID matching
       const existingAttempts = mockDb.getAttempts(test.id);
-      const existing = existingAttempts.find(
-        (a) => (a.student_roll_no || '').toLowerCase() === rollNo.trim().toLowerCase()
-      );
+      let existing = existingAttempts.find((a) => {
+        const aRoll = (a.student_roll_no || a.student_id || '').trim().toUpperCase();
+        const aId = (a.student_id || '').trim().toUpperCase();
+        return Boolean(cleanRoll) && (aRoll === cleanRoll || aId === cleanRoll);
+      });
+
+      // If not in local cache (e.g., reloaded or different browser), query Supabase directly
+      if (!existing && isSupabaseConfigured && supabase) {
+        try {
+          const { data: dbAttempts } = await supabase
+            .from('test_attempts')
+            .select('*')
+            .eq('test_id', test.id)
+            .or(`student_roll_no.ilike.${cleanRoll},student_id.ilike.${cleanRoll}`)
+            .order('started_at', { ascending: false })
+            .limit(5);
+
+          if (dbAttempts && dbAttempts.length > 0) {
+            // Strictly match the record to this student's UID
+            const matchedAtt = dbAttempts.find((att: any) => {
+              const r = (att.student_roll_no || att.student_id || '').trim().toUpperCase();
+              const id = (att.student_id || '').trim().toUpperCase();
+              return r === cleanRoll || id === cleanRoll;
+            });
+            if (matchedAtt) {
+              const foundAtt = matchedAtt as TestAttempt;
+              existing = foundAtt;
+              await mockDb.saveAttempt(foundAtt);
+            }
+          }
+        } catch (err) {
+          console.warn('Supabase attempt lookup error:', err);
+        }
+      }
 
       // Check 2: Student already completed & submitted test
       if (existing && (existing.status === 'submitted' || existing.status === 'auto_submitted')) {
         setError(
-          `Student UID "${existing.student_roll_no}" has already submitted this test. Multiple attempts are not permitted.`
+          `Student UID "${existing.student_roll_no || cleanRoll}" has already submitted this test. Multiple attempts are not permitted.`
         );
         setIsJoining(false);
         return;
       }
 
+      // Check 3: For timed tests, check if duration has expired while away
+      if (existing && !test.is_untimed) {
+        const startMs = new Date(existing.started_at).getTime();
+        const durationMs = (test.duration_minutes || 45) * 60 * 1000;
+        const endMs = startMs + durationMs;
+        if (Date.now() >= endMs) {
+          existing.status = 'auto_submitted';
+          existing.submitted_at = new Date().toISOString();
+          existing.score = mockDb.calculateAttemptScore(existing.id);
+          await mockDb.saveAttempt(existing);
+          setError(
+            `The allotted time for this examination has expired. Your attempt has been automatically submitted.`
+          );
+          setIsJoining(false);
+          return;
+        }
+      }
+
       let attempt: TestAttempt;
       if (existing) {
         attempt = existing;
+        // Update name if previously blank
+        if (studentName.trim() && !attempt.student_name) {
+          attempt.student_name = studentName.trim();
+          await mockDb.saveAttempt(attempt);
+        }
+        // Restore submissions from Supabase if re-entering from another browser
+        await mockDb.syncStudentAttemptSubmissions(attempt.id);
       } else {
         attempt = await mockDb.saveAttempt({
           id: 'att-' + Math.random().toString(36).substring(2, 9),
           test_id: test.id,
-          student_id: rollNo.trim(),
+          student_id: cleanRoll,
           student_name: studentName.trim(),
-          student_roll_no: rollNo.trim(),
+          student_roll_no: cleanRoll,
           started_at: new Date().toISOString(),
           status: 'in_progress',
           score: 0,
@@ -275,7 +342,7 @@ export const JoinTest: React.FC = () => {
                   required
                   disabled={isJoining}
                   value={rollNo}
-                  onChange={(e) => setRollNo(e.target.value)}
+                  onChange={(e) => setRollNo(e.target.value.toUpperCase())}
                   placeholder="e.g. 26BCS10145"
                   className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-zinc-800 rounded-2xl text-sm sm:text-base font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all uppercase disabled:opacity-60"
                 />

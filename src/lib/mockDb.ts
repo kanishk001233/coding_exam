@@ -563,6 +563,44 @@ class DatabaseService {
     }
   }
 
+  /**
+   * Targeted sync for a single student's submissions when re-entering or resuming.
+   */
+  public async syncStudentAttemptSubmissions(attemptId: string): Promise<void> {
+    if (!isSupabaseConfigured || !supabase || !attemptId) return;
+    try {
+      const { data: subsData } = await supabase
+        .from('submissions')
+        .select(`*, resultsRecord:submission_results (*)`)
+        .eq('attempt_id', attemptId);
+
+      if (subsData && subsData.length > 0) {
+        const normalized = subsData.map((s: any) => {
+          let testCaseResults: any[] = [];
+          if (s.resultsRecord) {
+            if (Array.isArray(s.resultsRecord)) {
+              testCaseResults = s.resultsRecord.length > 0 && s.resultsRecord[0].results ? s.resultsRecord[0].results : s.resultsRecord;
+            } else if (s.resultsRecord.results) {
+              testCaseResults = s.resultsRecord.results;
+            }
+          } else if (s.results) {
+            testCaseResults = Array.isArray(s.results) ? s.results : [];
+          }
+          return { ...s, results: testCaseResults };
+        });
+
+        const existingSubs = this.getSubmissions();
+        const subMap = new Map<string, Submission>(existingSubs.map(s => [s.id, s]));
+        for (const s of normalized) {
+          subMap.set(s.id, s);
+        }
+        localStorage.setItem(this.submissionsKey, JSON.stringify(Array.from(subMap.values())));
+      }
+    } catch (err) {
+      console.warn('syncStudentAttemptSubmissions error:', err);
+    }
+  }
+
   // Question Bank CRUD
   public getQuestionBank(): Omit<Question, 'test_id'>[] {
     try {
@@ -905,29 +943,46 @@ class DatabaseService {
   }
 
   public async saveAttempt(attempt: TestAttempt): Promise<TestAttempt> {
+    const rawRoll = (attempt.student_roll_no || attempt.student_id || '').trim();
+    const normalizedRoll = rawRoll.toUpperCase();
+    const normalizedAttempt: TestAttempt = {
+      ...attempt,
+      student_id: normalizedRoll || attempt.student_id,
+      student_roll_no: normalizedRoll || attempt.student_roll_no,
+    };
+
     const attempts = this.getAttempts();
-    const existingIndex = attempts.findIndex(a => a.id === attempt.id);
+    const existingIndex = attempts.findIndex(
+      a => a.id === normalizedAttempt.id || (
+        a.test_id === normalizedAttempt.test_id &&
+        Boolean(normalizedRoll) &&
+        ((a.student_roll_no || a.student_id || '').trim().toUpperCase() === normalizedRoll)
+      )
+    );
     if (existingIndex >= 0) {
-      attempts[existingIndex] = attempt;
+      attempts[existingIndex] = {
+        ...attempts[existingIndex],
+        ...normalizedAttempt,
+      };
     } else {
-      attempts.push(attempt);
+      attempts.push(normalizedAttempt);
     }
     localStorage.setItem(this.attemptsKey, JSON.stringify(attempts));
 
     if (isSupabaseConfigured && supabase) {
       try {
         const { error: attErr } = await supabase.from('test_attempts').upsert({
-          id: attempt.id,
-          test_id: attempt.test_id,
-          student_id: attempt.student_id,
-          student_name: attempt.student_name,
-          student_roll_no: attempt.student_roll_no,
-          started_at: attempt.started_at,
-          submitted_at: attempt.submitted_at,
-          status: attempt.status,
-          score: attempt.score,
-          tab_switch_count: attempt.tab_switch_count || 0,
-          fullscreen_exit_count: attempt.fullscreen_exit_count || 0,
+          id: normalizedAttempt.id,
+          test_id: normalizedAttempt.test_id,
+          student_id: normalizedAttempt.student_id,
+          student_name: normalizedAttempt.student_name,
+          student_roll_no: normalizedAttempt.student_roll_no,
+          started_at: normalizedAttempt.started_at,
+          submitted_at: normalizedAttempt.submitted_at,
+          status: normalizedAttempt.status,
+          score: normalizedAttempt.score,
+          tab_switch_count: normalizedAttempt.tab_switch_count || 0,
+          fullscreen_exit_count: normalizedAttempt.fullscreen_exit_count || 0,
         });
         if (attErr) {
           console.error('Supabase test_attempts upsert failed:', attErr.message, attErr);
@@ -937,7 +992,7 @@ class DatabaseService {
       }
     }
 
-    return attempt;
+    return normalizedAttempt;
   }
 
   public async deleteAttempt(attemptId: string): Promise<void> {
@@ -1174,17 +1229,47 @@ class DatabaseService {
     }
   }
 
-  public clearStorageAfterTest(attemptId: string): void {
+  public clearAllStudentDrafts(): void {
     try {
-      this.clearAttemptDrafts(attemptId);
-      localStorage.removeItem(`c_exam_ai_state_${attemptId}`);
-      localStorage.removeItem(`c_exam_last_q_${attemptId}`);
-      
-      // Clean up all localStorage keys associated with this attempt
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key.includes(attemptId) || key.startsWith(`c_exam_ai_state_${attemptId}`))) {
+        if (key && (
+          key.startsWith(this.codeDraftsKey) ||
+          key.startsWith('c_exam_ai_state_') ||
+          key.startsWith('c_exam_last_q_')
+        )) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => {
+        try {
+          localStorage.removeItem(k);
+        } catch {}
+      });
+    } catch (e) {
+      console.error('Error clearing student drafts:', e);
+    }
+  }
+
+  public clearStorageAfterTest(attemptId?: string): void {
+    try {
+      if (attemptId) {
+        this.clearAttemptDrafts(attemptId);
+        localStorage.removeItem(`c_exam_ai_state_${attemptId}`);
+        localStorage.removeItem(`c_exam_last_q_${attemptId}`);
+      }
+      
+      // Clean up all localStorage keys associated with this attempt or any student drafts
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (
+          (attemptId && key.includes(attemptId)) ||
+          key.startsWith(this.codeDraftsKey) ||
+          key.startsWith('c_exam_ai_state_') ||
+          key.startsWith('c_exam_last_q_')
+        )) {
           keysToRemove.push(key);
         }
       }
