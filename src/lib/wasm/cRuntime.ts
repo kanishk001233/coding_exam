@@ -29,6 +29,75 @@ export class RuntimeError extends Error {
   }
 }
 
+export class CPointer {
+  target: any; // Map (scope), Array, or Object
+  prop: string | number;
+  offset: number;
+
+  constructor(target: any, prop: string | number = '', offset: number = 0) {
+    this.target = target;
+    this.prop = prop;
+    this.offset = offset;
+  }
+
+  get(): any {
+    if (this.target instanceof Map) {
+      const val = this.target.get(this.prop);
+      if (Array.isArray(val)) {
+        return val[this.offset];
+      }
+      if (val instanceof CPointer) {
+        return val.get();
+      }
+      return val;
+    }
+    if (Array.isArray(this.target)) {
+      const idx = Number(this.prop) + this.offset;
+      return this.target[idx];
+    }
+    if (this.target && typeof this.target === 'object') {
+      if (this.prop !== undefined && this.prop !== '') {
+        return this.target[this.prop];
+      }
+      return this.target;
+    }
+    return 0;
+  }
+
+  set(val: any): void {
+    if (this.target instanceof Map) {
+      const current = this.target.get(this.prop);
+      if (Array.isArray(current)) {
+        current[this.offset] = val;
+      } else if (current instanceof CPointer) {
+        current.set(val);
+      } else {
+        this.target.set(this.prop, val);
+      }
+    } else if (Array.isArray(this.target)) {
+      const idx = Number(this.prop) + this.offset;
+      this.target[idx] = val;
+    } else if (this.target && typeof this.target === 'object') {
+      if (this.prop !== undefined && this.prop !== '') {
+        this.target[this.prop] = val;
+      }
+    }
+  }
+}
+
+export interface StructField {
+  name: string;
+  type: string;
+  isPointer: boolean;
+  arraySizes: (ASTNode | null)[];
+}
+
+export interface StructDefinition {
+  kind: 'struct' | 'union';
+  name?: string;
+  fields: StructField[];
+}
+
 // Token types for Lexer
 export enum TokenType {
   KEYWORD = 'KEYWORD',
@@ -53,7 +122,7 @@ export interface Token {
 const KEYWORDS = new Set([
   'int', 'char', 'float', 'double', 'void', 'long', 'short', 'unsigned', 'signed',
   'if', 'else', 'while', 'for', 'do', 'return', 'break', 'continue', 'switch', 'case', 'default',
-  'struct', 'typedef', 'sizeof', 'const', 'static', 'bool', 'true', 'false'
+  'struct', 'union', 'typedef', 'sizeof', 'const', 'static', 'bool', 'true', 'false'
 ]);
 
 export class Lexer {
@@ -189,7 +258,7 @@ export class Lexer {
         continue;
       }
 
-      if ('(){}[];,'.includes(char)) {
+      if ('(){}[];,.'.includes(char)) {
         this.advance();
         tokens.push({ type: TokenType.PUNCTUATION, value: char, line: startLine, column: startCol });
         continue;
@@ -262,6 +331,8 @@ export class Lexer {
 export class Parser {
   private tokens: Token[];
   private current: number = 0;
+  private structDefs: Map<string, StructDefinition> = new Map();
+  private typedefs: Set<string> = new Set();
 
   constructor(tokens: Token[]) {
     // Filter out preprocessor tokens for the parser
@@ -272,16 +343,191 @@ export class Parser {
     const program: ASTNode = {
       type: 'Program',
       body: [],
+      structDefs: this.structDefs,
     };
 
     while (!this.isAtEnd()) {
-      program.body.push(this.parseDeclarationOrFunction());
+      if (this.match(';')) continue;
+
+      if (this.match('typedef')) {
+        const td = this.parseTypedef();
+        if (Array.isArray(td)) program.body.push(...td);
+        else program.body.push(td);
+      } else if (this.isStructOrUnionDefinition()) {
+        const def = this.parseStructOrUnionDefinition();
+        if (Array.isArray(def)) program.body.push(...def);
+        else program.body.push(def);
+      } else {
+        const decl = this.parseDeclarationOrFunction();
+        if (Array.isArray(decl)) program.body.push(...decl);
+        else program.body.push(decl);
+      }
     }
 
     return program;
   }
 
-  private parseDeclarationOrFunction(): ASTNode {
+  private isStructOrUnionDefinition(): boolean {
+    if (!this.check('struct') && !this.check('union')) return false;
+    const next1 = this.peekNext();
+    if (!next1) return false;
+    if (next1.value === '{') return true;
+    if (next1.type === TokenType.IDENTIFIER) {
+      const next2 = this.tokens[this.current + 2];
+      if (next2 && next2.value === '{') return true;
+    }
+    return false;
+  }
+
+  private parseStructFields(): StructField[] {
+    this.consume('{', "Expect '{' before struct/union fields");
+    const fields: StructField[] = [];
+
+    while (!this.check('}') && !this.isAtEnd()) {
+      const fieldType = this.consumeType();
+      do {
+        let isPointer = false;
+        while (this.match('*')) isPointer = true;
+        const nameToken = this.consume(TokenType.IDENTIFIER, "Expect member name");
+        const arraySizes: (ASTNode | null)[] = [];
+        while (this.match('[')) {
+          if (this.match(']')) {
+            arraySizes.push(null);
+          } else {
+            const sizeExpr = this.parseExpression();
+            this.consume(']', "Expect ']' after array size");
+            arraySizes.push(sizeExpr);
+          }
+        }
+        fields.push({
+          name: nameToken.value,
+          type: fieldType,
+          isPointer,
+          arraySizes,
+        });
+      } while (this.match(','));
+      this.consume(';', "Expect ';' after struct member declaration");
+    }
+
+    this.consume('}', "Expect '}' after struct/union body");
+    return fields;
+  }
+
+  private parseStructOrUnionDefinition(): ASTNode | ASTNode[] {
+    const kind = this.advance().value as 'struct' | 'union';
+    let tag = '';
+    if (this.check(TokenType.IDENTIFIER)) {
+      tag = this.advance().value;
+    }
+    const fields = this.parseStructFields();
+    const structDef: StructDefinition = { kind, name: tag, fields };
+    if (tag) {
+      this.structDefs.set(`${kind} ${tag}`, structDef);
+      this.structDefs.set(tag, structDef);
+    }
+
+    const defNode: ASTNode = {
+      type: 'StructDefinition',
+      kind,
+      name: tag,
+      fields,
+    };
+
+    if (this.match(';')) {
+      return defNode;
+    }
+
+    // struct Point { int x, y; } p1, p2;
+    const decls: ASTNode[] = [];
+    const typeName = tag ? `${kind} ${tag}` : kind;
+    do {
+      let isPointer = false;
+      while (this.match('*')) isPointer = true;
+      const nameToken = this.consume(TokenType.IDENTIFIER, "Expect variable name");
+      const name = nameToken.value;
+      const arraySizes: (ASTNode | null)[] = [];
+      while (this.match('[')) {
+        if (this.match(']')) {
+          arraySizes.push(null);
+        } else {
+          const sizeExpr = this.parseExpression();
+          this.consume(']', "Expect ']' after array size");
+          arraySizes.push(sizeExpr);
+        }
+      }
+      let initialValue: ASTNode | null = null;
+      if (this.match('=')) {
+        initialValue = this.parseInitializer();
+      }
+      decls.push({
+        type: 'VariableDeclaration',
+        varType: typeName,
+        name,
+        isPointer,
+        arraySizes,
+        initialValue,
+        line: nameToken.line,
+      });
+    } while (this.match(','));
+    this.consume(';', "Expect ';' after struct variable declaration");
+
+    return [defNode, { type: 'VariableDeclarationList', declarations: decls }];
+  }
+
+  private parseTypedef(): ASTNode | ASTNode[] {
+    if (this.isStructOrUnionDefinition()) {
+      const kind = this.advance().value as 'struct' | 'union';
+      let tag = '';
+      if (this.check(TokenType.IDENTIFIER)) {
+        tag = this.advance().value;
+      }
+      const fields = this.parseStructFields();
+      const aliases: string[] = [];
+      do {
+        let isPtr = false;
+        while (this.match('*')) isPtr = true;
+        const aliasToken = this.consume(TokenType.IDENTIFIER, "Expect alias name in typedef");
+        this.typedefs.add(aliasToken.value);
+        aliases.push(aliasToken.value);
+        const structDef: StructDefinition = { kind, name: aliasToken.value, fields };
+        this.structDefs.set(aliasToken.value, structDef);
+        if (tag) {
+          this.structDefs.set(`${kind} ${tag}`, structDef);
+          this.structDefs.set(tag, structDef);
+        }
+      } while (this.match(','));
+      this.consume(';', "Expect ';' after typedef");
+      return {
+        type: 'TypedefStructDeclaration',
+        kind,
+        tag,
+        aliases,
+        fields,
+      };
+    }
+
+    // Normal typedef: typedef existing_type [*] alias;
+    const baseType = this.consumeType();
+    const aliases: string[] = [];
+    do {
+      let isPtr = false;
+      while (this.match('*')) isPtr = true;
+      const aliasToken = this.consume(TokenType.IDENTIFIER, "Expect alias name in typedef");
+      this.typedefs.add(aliasToken.value);
+      aliases.push(aliasToken.value);
+      if (this.structDefs.has(baseType)) {
+        this.structDefs.set(aliasToken.value, this.structDefs.get(baseType)!);
+      }
+    } while (this.match(','));
+    this.consume(';', "Expect ';' after typedef");
+    return {
+      type: 'TypedefDeclaration',
+      baseType,
+      aliases,
+    };
+  }
+
+  private parseDeclarationOrFunction(): ASTNode | ASTNode[] {
     // Type specifier e.g. int, void, char, float, double
     const returnType = this.consumeType();
     
@@ -361,9 +607,8 @@ export class Parser {
     if (this.match('=')) {
       initialValue = this.parseInitializer();
     }
-    this.consume(';', "Expect ';' after variable declaration");
 
-    return {
+    const decls: ASTNode[] = [{
       type: 'VariableDeclaration',
       varType: returnType,
       name,
@@ -371,7 +616,41 @@ export class Parser {
       arraySizes,
       initialValue,
       line: nameToken.line,
-    };
+    }];
+
+    while (this.match(',')) {
+      let nextIsPtr = false;
+      while (this.match('*')) nextIsPtr = true;
+      const nextName = this.consume(TokenType.IDENTIFIER, "Expect variable name").value;
+      const nextArraySizes: (ASTNode | null)[] = [];
+      while (this.match('[')) {
+        if (this.match(']')) {
+          nextArraySizes.push(null);
+        } else {
+          const sizeExpr = this.parseExpression();
+          this.consume(']', "Expect ']' after array size");
+          nextArraySizes.push(sizeExpr);
+        }
+      }
+      let nextInit: ASTNode | null = null;
+      if (this.match('=')) {
+        nextInit = this.parseInitializer();
+      }
+      decls.push({
+        type: 'VariableDeclaration',
+        varType: returnType,
+        name: nextName,
+        isPointer: nextIsPtr,
+        arraySizes: nextArraySizes,
+        initialValue: nextInit,
+        line: nameToken.line,
+      });
+    }
+
+    this.consume(';', "Expect ';' after variable declaration");
+
+    if (decls.length === 1) return decls[0];
+    return { type: 'VariableDeclarationList', declarations: decls };
   }
 
   private parseBlock(): ASTNode {
@@ -390,6 +669,22 @@ export class Parser {
   }
 
   private parseStatement(): ASTNode {
+    if (this.match(';')) {
+      return { type: 'EmptyStatement' };
+    }
+
+    if (this.match('typedef')) {
+      const td = this.parseTypedef();
+      if (Array.isArray(td)) return { type: 'CompoundStatement', statements: td };
+      return td;
+    }
+
+    if (this.isStructOrUnionDefinition()) {
+      const def = this.parseStructOrUnionDefinition();
+      if (Array.isArray(def)) return { type: 'CompoundStatement', statements: def };
+      return def;
+    }
+
     // Check for variable declaration inside statement
     if (this.isTypeSpecifier(this.peek())) {
       return this.parseLocalDeclaration();
@@ -536,7 +831,18 @@ export class Parser {
       const elements: ASTNode[] = [];
       if (!this.check('}')) {
         do {
-          elements.push(this.parseInitializer());
+          if (this.match('.')) {
+            const memberToken = this.consume(TokenType.IDENTIFIER, "Expect member name after '.' in designated initializer");
+            this.consume('=', "Expect '=' after designated initializer member");
+            const val = this.parseInitializer();
+            elements.push({
+              type: 'DesignatedInitializer',
+              member: memberToken.value,
+              value: val,
+            });
+          } else {
+            elements.push(this.parseInitializer());
+          }
         } while (this.match(','));
       }
       this.consume('}', "Expect '}' after initializer list");
@@ -685,11 +991,35 @@ export class Parser {
   }
 
   private parseUnary(): ASTNode {
+    // Check for cast expression: ( type [*] ) unary_expr
+    if (this.check('(')) {
+      const savedPos = this.current;
+      this.advance(); // consume '('
+      if (this.isTypeSpecifier(this.peek())) {
+        try {
+          const castType = this.consumeType();
+          while (this.match('*')) { /* pointer cast */ }
+          if (this.match(')')) {
+            const right = this.parseUnary();
+            return {
+              type: 'CastExpression',
+              castType,
+              argument: right,
+            };
+          }
+        } catch {
+          // Not a cast
+        }
+      }
+      this.current = savedPos; // rewind
+    }
+
     if (this.match('!', '~', '-', '+', '*', '&', '++', '--', 'sizeof')) {
       const operator = this.previous().value;
       if (operator === 'sizeof' && this.match('(')) {
         if (this.isTypeSpecifier(this.peek())) {
           const typeName = this.consumeType();
+          while (this.match('*')) { /* pointer size */ }
           this.consume(')', "Expect ')' after sizeof type");
           return { type: 'SizeofTypeExpression', typeName };
         }
@@ -721,6 +1051,16 @@ export class Parser {
         const index = this.parseExpression();
         this.consume(']', "Expect ']' after array subscript");
         expr = { type: 'MemberExpression', object: expr, property: index, computed: true };
+      } else if (this.match('.') || this.match('->')) {
+        const operator = this.previous().value;
+        const propToken = this.consume(TokenType.IDENTIFIER, `Expect member identifier after '${operator}'`);
+        expr = {
+          type: 'MemberExpression',
+          object: expr,
+          property: { type: 'Identifier', name: propToken.value },
+          computed: false,
+          operator,
+        };
       } else if (this.match('++') || this.match('--')) {
         const operator = this.previous().value;
         expr = { type: 'UnaryExpression', operator, prefix: false, argument: expr };
@@ -763,12 +1103,39 @@ export class Parser {
   }
 
   private isTypeSpecifier(token: Token): boolean {
-    return ['int', 'char', 'float', 'double', 'void', 'long', 'short', 'unsigned', 'signed', 'bool'].includes(token.value);
+    if (!token) return false;
+    if (['int', 'char', 'float', 'double', 'void', 'long', 'short', 'unsigned', 'signed', 'bool'].includes(token.value)) {
+      return true;
+    }
+    if (token.value === 'struct' || token.value === 'union') {
+      return true;
+    }
+    if (token.type === TokenType.IDENTIFIER && this.typedefs.has(token.value)) {
+      return true;
+    }
+    return false;
   }
 
   private consumeType(): string {
+    while (this.match('const') || this.match('static')) {
+      // skip qualifiers
+    }
+
+    if (this.check('struct') || this.check('union')) {
+      const kind = this.advance().value;
+      if (this.check(TokenType.IDENTIFIER)) {
+        const tag = this.advance().value;
+        return `${kind} ${tag}`;
+      }
+      return kind;
+    }
+
+    if (this.check(TokenType.IDENTIFIER) && this.typedefs.has(this.peek().value)) {
+      return this.advance().value;
+    }
+
     let typeName = '';
-    while (this.isTypeSpecifier(this.peek())) {
+    while (this.isTypeSpecifier(this.peek()) && !['struct', 'union'].includes(this.peek().value)) {
       typeName += (typeName ? ' ' : '') + this.advance().value;
     }
     if (!typeName) {
@@ -838,6 +1205,7 @@ export interface RuntimeContext {
 export class Interpreter {
   private globalScope: Map<string, any> = new Map();
   private functions: Map<string, ASTNode> = new Map();
+  private structDefs: Map<string, StructDefinition> = new Map();
   private ctx: RuntimeContext;
 
   constructor(input: string = '', outputLimitKb: number = 100) {
@@ -933,6 +1301,8 @@ export class Interpreter {
                 formatted += typeof rawVal === 'number' ? String.fromCharCode(rawVal) : String(rawVal)[0];
               } else if (typeChar === 's') {
                 formatted += this.toCString(rawVal);
+              } else if (typeChar === 'p') {
+                formatted += rawVal === null ? '(nil)' : '0x' + (Math.abs(typeof rawVal === 'number' ? rawVal : 12345678)).toString(16);
               } else {
                 formatted += this.toCString(rawVal);
               }
@@ -1426,18 +1796,154 @@ export class Interpreter {
         return combined;
       }
     });
+
+    // stdlib memory management
+    this.functions.set('malloc', {
+      type: 'BuiltinFunction',
+      name: 'malloc',
+      call: (args: any[]) => {
+        const bytes = Number(args[0]) || 4;
+        const count = Math.max(1, Math.ceil(bytes / 4));
+        const arr: any = new Array(count).fill(0);
+        return arr;
+      }
+    });
+
+    this.functions.set('calloc', {
+      type: 'BuiltinFunction',
+      name: 'calloc',
+      call: (args: any[]) => {
+        const num = Number(args[0]) || 1;
+        const size = Number(args[1]) || 4;
+        const count = Math.max(1, num);
+        const arr: any = new Array(count).fill(0);
+        return arr;
+      }
+    });
+
+    this.functions.set('free', {
+      type: 'BuiltinFunction',
+      name: 'free',
+      call: () => 0
+    });
+
+    this.functions.set('realloc', {
+      type: 'BuiltinFunction',
+      name: 'realloc',
+      call: (args: any[]) => {
+        const ptr = args[0];
+        const newBytes = Number(args[1]) || 4;
+        const newCount = Math.max(1, Math.ceil(newBytes / 4));
+        if (Array.isArray(ptr)) {
+          while (ptr.length < newCount) ptr.push(0);
+          return ptr;
+        }
+        return new Array(newCount).fill(0);
+      }
+    });
   }
 
-  private createNDArray(sizes: (ASTNode | null)[], scope: Map<string, any>, depth: number = 0): any[] {
+  public isStructType(typeName: string): boolean {
+    if (!typeName) return false;
+    const clean = typeName.replace(/\s*\*+$/, '').trim();
+    return this.structDefs.has(clean) ||
+           this.structDefs.has(clean.replace(/^(struct|union)\s+/, '')) ||
+           clean.startsWith('struct ') ||
+           clean.startsWith('union ');
+  }
+
+  public getStructDef(typeName: string): StructDefinition | undefined {
+    if (!typeName) return undefined;
+    const clean = typeName.replace(/\s*\*+$/, '').trim();
+    if (this.structDefs.has(clean)) return this.structDefs.get(clean);
+    const bare = clean.replace(/^(struct|union)\s+/, '');
+    if (this.structDefs.has(bare)) return this.structDefs.get(bare);
+    if (this.structDefs.has(`struct ${bare}`)) return this.structDefs.get(`struct ${bare}`);
+    if (this.structDefs.has(`union ${bare}`)) return this.structDefs.get(`union ${bare}`);
+    return undefined;
+  }
+
+  private getFieldSize(f: StructField): number {
+    if (f.isPointer) return 8;
+    let baseSize = 4;
+    if (f.type === 'char' || f.type === 'bool') baseSize = 1;
+    else if (f.type === 'short') baseSize = 2;
+    else if (f.type === 'double' || f.type === 'long long') baseSize = 8;
+    else if (this.isStructType(f.type)) baseSize = 16;
+    if (f.arraySizes && f.arraySizes.length > 0) {
+      let count = 1;
+      for (const s of f.arraySizes) {
+        count *= s && s.type === 'Literal' ? Number(s.value) : 10;
+      }
+      return baseSize * count;
+    }
+    return baseSize;
+  }
+
+  private instantiateType(typeName: string, scope: Map<string, any>): any {
+    const def = this.getStructDef(typeName);
+    const obj: Record<string, any> = {};
+    if (def && def.fields) {
+      for (const f of def.fields) {
+        if (f.arraySizes && f.arraySizes.length > 0) {
+          if (f.type === 'char' && f.arraySizes.length === 1) {
+            obj[f.name] = '';
+          } else {
+            obj[f.name] = this.createNDArray(f.arraySizes, scope, 0, f.type);
+          }
+        } else if (f.isPointer) {
+          obj[f.name] = null;
+        } else if (this.isStructType(f.type)) {
+          obj[f.name] = this.instantiateType(f.type, scope);
+        } else {
+          obj[f.name] = 0;
+        }
+      }
+    }
+    return obj;
+  }
+
+  private fillStruct(obj: any, initNode: ASTNode, structDef: StructDefinition | undefined, scope: Map<string, any>): void {
+    if (!initNode || initNode.type !== 'ArrayInitializer' || !obj) return;
+    const fields = structDef?.fields || [];
+    let fieldIdx = 0;
+
+    for (let i = 0; i < initNode.elements.length; i++) {
+      const elem = initNode.elements[i];
+      if (elem.type === 'DesignatedInitializer') {
+        const val = this.evaluateExpression(elem.value, scope);
+        obj[elem.member] = val;
+      } else {
+        if (fieldIdx < fields.length) {
+          const field = fields[fieldIdx++];
+          if (elem.type === 'ArrayInitializer') {
+            if (Array.isArray(obj[field.name])) {
+              this.fillNDArray(obj[field.name], elem, scope);
+            } else if (typeof obj[field.name] === 'object' && obj[field.name] !== null) {
+              const nestedDef = this.getStructDef(field.type);
+              this.fillStruct(obj[field.name], elem, nestedDef, scope);
+            }
+          } else {
+            obj[field.name] = this.evaluateExpression(elem, scope);
+          }
+        }
+      }
+    }
+  }
+
+  private createNDArray(sizes: (ASTNode | null)[], scope: Map<string, any>, depth: number = 0, elemType: string = 'int'): any[] {
     const sizeExpr = sizes[depth];
     const evaluatedSize = sizeExpr ? Number(this.evaluateExpression(sizeExpr, scope)) : 100;
     const currentSize = Math.max(1, !isNaN(evaluatedSize) && evaluatedSize > 0 ? Math.trunc(evaluatedSize) : 100);
 
     if (depth === sizes.length - 1) {
+      if (this.isStructType(elemType)) {
+        return Array.from({ length: currentSize }, () => this.instantiateType(elemType, scope));
+      }
       return new Array(currentSize).fill(0);
     }
 
-    return Array.from({ length: currentSize }, () => this.createNDArray(sizes, scope, depth + 1));
+    return Array.from({ length: currentSize }, () => this.createNDArray(sizes, scope, depth + 1, elemType));
   }
 
   private fillNDArray(arr: any[], initNode: ASTNode, scope: Map<string, any>): void {
@@ -1447,6 +1953,8 @@ export class Interpreter {
       if (elem.type === 'ArrayInitializer') {
         if (Array.isArray(arr[i])) {
           this.fillNDArray(arr[i], elem, scope);
+        } else if (typeof arr[i] === 'object' && arr[i] !== null) {
+          this.fillStruct(arr[i], elem, undefined, scope);
         }
       } else {
         arr[i] = this.evaluateExpression(elem, scope);
@@ -1460,14 +1968,31 @@ export class Interpreter {
       target = target.argument;
     }
 
+    if (target.type === 'UnaryExpression' && target.operator === '*') {
+      const ptr = this.evaluateExpression(target.argument, scope);
+      if (ptr instanceof CPointer) {
+        ptr.set(value);
+      } else if (Array.isArray(ptr)) {
+        ptr[0] = value;
+      } else if (ptr && typeof ptr === 'object') {
+        Object.assign(ptr, value);
+      }
+      return;
+    }
+
     if (target.type === 'Identifier') {
-      if (scope.has(target.name)) {
-        scope.set(target.name, value);
+      const targetScope = scope.has(target.name) ? scope : this.globalScope;
+      const current = targetScope.get(target.name);
+      if (current instanceof CPointer) {
+        current.set(value);
       } else {
-        this.globalScope.set(target.name, value);
+        targetScope.set(target.name, value);
       }
     } else if (target.type === 'MemberExpression') {
-      const obj = this.evaluateExpression(target.object, scope);
+      let obj = this.evaluateExpression(target.object, scope);
+      if (obj instanceof CPointer) {
+        obj = obj.get();
+      }
       const prop = target.computed
         ? this.evaluateExpression(target.property, scope)
         : target.property.name;
@@ -1478,10 +2003,19 @@ export class Interpreter {
   }
 
   public execute(program: ASTNode): { stdout: string; stderr: string; exitCode: number } {
+    // 0. Import struct definitions from parsed program
+    if (program.structDefs) {
+      for (const [k, v] of program.structDefs.entries()) {
+        this.structDefs.set(k, v);
+      }
+    }
+
     // 1. Collect all function definitions and global declarations
     for (const item of program.body) {
       if (item.type === 'FunctionDefinition') {
         this.functions.set(item.name, item);
+      } else if (item.type === 'StructDefinition' || item.type === 'TypedefStructDeclaration' || item.type === 'TypedefDeclaration') {
+        this.executeStatement(item, this.globalScope);
       } else if (item.type === 'VariableDeclaration' || item.type === 'VariableDeclarationList') {
         this.executeStatement(item, this.globalScope);
       }
@@ -1512,7 +2046,12 @@ export class Interpreter {
     // Bind parameters
     for (let i = 0; i < funcNode.params.length; i++) {
       const param = funcNode.params[i];
-      localScope.set(param.name, args[i] !== undefined ? args[i] : 0);
+      const rawArg = args[i] !== undefined ? args[i] : 0;
+      // Structs passed by value are copied
+      const paramVal = (rawArg && typeof rawArg === 'object' && !(rawArg instanceof CPointer) && !Array.isArray(rawArg))
+        ? { ...rawArg }
+        : rawArg;
+      localScope.set(param.name, paramVal);
     }
 
     const result = this.executeStatement(funcNode.body, localScope);
@@ -1529,6 +2068,49 @@ export class Interpreter {
     }
 
     switch (stmt.type) {
+      case 'EmptyStatement': {
+        return null;
+      }
+
+      case 'CompoundStatement': {
+        for (const s of stmt.statements) {
+          const res = this.executeStatement(s, scope);
+          if (res && (res.isReturn || res.isBreak || res.isContinue)) return res;
+        }
+        return null;
+      }
+
+      case 'StructDefinition': {
+        const key = `${stmt.kind} ${stmt.name}`;
+        this.structDefs.set(key, stmt as unknown as StructDefinition);
+        if (stmt.name) {
+          this.structDefs.set(stmt.name, stmt as unknown as StructDefinition);
+        }
+        return null;
+      }
+
+      case 'TypedefStructDeclaration': {
+        const def: StructDefinition = { kind: stmt.kind, name: stmt.tag, fields: stmt.fields };
+        if (stmt.tag) {
+          this.structDefs.set(`${stmt.kind} ${stmt.tag}`, def);
+          this.structDefs.set(stmt.tag, def);
+        }
+        for (const alias of stmt.aliases) {
+          this.structDefs.set(alias, def);
+        }
+        return null;
+      }
+
+      case 'TypedefDeclaration': {
+        if (this.structDefs.has(stmt.baseType)) {
+          const baseDef = this.structDefs.get(stmt.baseType)!;
+          for (const alias of stmt.aliases) {
+            this.structDefs.set(alias, baseDef);
+          }
+        }
+        return null;
+      }
+
       case 'BlockStatement': {
         const blockScope = new Map<string, any>(scope);
         for (const s of stmt.statements) {
@@ -1556,10 +2138,31 @@ export class Interpreter {
 
       case 'VariableDeclaration': {
         let val: any = 0;
-        if (stmt.arraySizes && stmt.arraySizes.length > 0) {
-          val = this.createNDArray(stmt.arraySizes, scope, 0);
+        if (stmt.isPointer) {
+          if (stmt.initialValue) {
+            val = this.evaluateExpression(stmt.initialValue, scope);
+          } else {
+            val = null;
+          }
+        } else if (stmt.arraySizes && stmt.arraySizes.length > 0) {
+          val = this.createNDArray(stmt.arraySizes, scope, 0, stmt.varType);
           if (stmt.initialValue && stmt.initialValue.type === 'ArrayInitializer') {
             this.fillNDArray(val, stmt.initialValue, scope);
+          }
+        } else if (this.isStructType(stmt.varType)) {
+          val = this.instantiateType(stmt.varType, scope);
+          if (stmt.initialValue) {
+            if (stmt.initialValue.type === 'ArrayInitializer') {
+              const def = this.getStructDef(stmt.varType);
+              this.fillStruct(val, stmt.initialValue, def, scope);
+            } else {
+              const rightVal = this.evaluateExpression(stmt.initialValue, scope);
+              if (rightVal && typeof rightVal === 'object' && !(rightVal instanceof CPointer) && !Array.isArray(rightVal)) {
+                val = { ...rightVal };
+              } else {
+                val = rightVal;
+              }
+            }
           }
         } else if (stmt.initialValue) {
           val = this.evaluateExpression(stmt.initialValue, scope);
@@ -1666,6 +2269,15 @@ export class Interpreter {
         throw new RuntimeError(`Use of undeclared variable '${expr.name}'`);
       }
 
+      case 'CastExpression': {
+        const val = this.evaluateExpression(expr.argument, scope);
+        const t = expr.castType;
+        if (['int', 'long', 'short'].includes(t)) return Math.trunc(Number(val));
+        if (['float', 'double'].includes(t)) return Number(val);
+        if (t === 'char') return Number(val) & 0xFF;
+        return val;
+      }
+
       case 'AssignmentExpression': {
         const rightVal = this.evaluateExpression(expr.right, scope);
         if (expr.left.type === 'Identifier') {
@@ -1677,12 +2289,18 @@ export class Interpreter {
           else if (expr.operator === '*=') finalVal = currentVal * rightVal;
           else if (expr.operator === '/=') finalVal = Math.trunc(currentVal / rightVal);
           else if (expr.operator === '%=') finalVal = currentVal % rightVal;
+          else if (rightVal && typeof rightVal === 'object' && !(rightVal instanceof CPointer) && !Array.isArray(rightVal)) {
+            finalVal = { ...rightVal };
+          }
 
           if (scope.has(varName)) scope.set(varName, finalVal);
           else this.globalScope.set(varName, finalVal);
           return finalVal;
         } else if (expr.left.type === 'MemberExpression') {
-          const obj = this.evaluateExpression(expr.left.object, scope);
+          let obj = this.evaluateExpression(expr.left.object, scope);
+          if (obj instanceof CPointer) {
+            obj = obj.get();
+          }
           const prop = expr.left.computed
             ? this.evaluateExpression(expr.left.property, scope)
             : expr.left.property.name;
@@ -1692,6 +2310,9 @@ export class Interpreter {
           else if (expr.operator === '*=') finalVal = (obj[prop] !== undefined ? obj[prop] : 0) * rightVal;
           else if (expr.operator === '/=') finalVal = Math.trunc((obj[prop] !== undefined ? obj[prop] : 0) / rightVal);
           else if (expr.operator === '%=') finalVal = (obj[prop] !== undefined ? obj[prop] : 0) % rightVal;
+          else if (rightVal && typeof rightVal === 'object' && !(rightVal instanceof CPointer) && !Array.isArray(rightVal)) {
+            finalVal = { ...rightVal };
+          }
 
           if (typeof obj === 'string' && expr.left.object.type === 'Identifier') {
             const varName = expr.left.object.name;
@@ -1707,6 +2328,23 @@ export class Interpreter {
             obj[prop] = finalVal;
           }
           return finalVal;
+        } else if (expr.left.type === 'UnaryExpression' && expr.left.operator === '*') {
+          const target = this.evaluateExpression(expr.left.argument, scope);
+          let finalVal = rightVal;
+          if (rightVal && typeof rightVal === 'object' && !(rightVal instanceof CPointer) && !Array.isArray(rightVal)) {
+            finalVal = { ...rightVal };
+          }
+          if (target instanceof CPointer) {
+            target.set(finalVal);
+            return finalVal;
+          } else if (Array.isArray(target)) {
+            target[0] = finalVal;
+            return finalVal;
+          } else if (target && typeof target === 'object') {
+            Object.assign(target, finalVal);
+            return finalVal;
+          }
+          throw new RuntimeError("Cannot dereference non-pointer value in assignment");
         }
         throw new RuntimeError("Invalid lvalue in assignment");
       }
@@ -1716,13 +2354,50 @@ export class Interpreter {
         const right = this.evaluateExpression(expr.right, scope);
 
         switch (expr.operator) {
-          case '+': return left + right;
-          case '-': return left - right;
+          case '+': {
+            if (left instanceof CPointer && typeof right === 'number') {
+              return new CPointer(left.target, left.prop, left.offset + right);
+            }
+            if (right instanceof CPointer && typeof left === 'number') {
+              return new CPointer(right.target, right.prop, right.offset + left);
+            }
+            if (Array.isArray(left) && typeof right === 'number') {
+              return new CPointer(left, 0, right);
+            }
+            return left + right;
+          }
+          case '-': {
+            if (left instanceof CPointer && typeof right === 'number') {
+              return new CPointer(left.target, left.prop, left.offset - right);
+            }
+            if (left instanceof CPointer && right instanceof CPointer) {
+              if (left.target === right.target) {
+                const idx1 = Number(left.prop) + left.offset;
+                const idx2 = Number(right.prop) + right.offset;
+                return idx1 - idx2;
+              }
+            }
+            return left - right;
+          }
           case '*': return left * right;
           case '/': return typeof left === 'number' && Number.isInteger(left) && Number.isInteger(right) ? Math.trunc(left / right) : left / right;
           case '%': return left % right;
-          case '==': return left == right ? 1 : 0;
-          case '!=': return left != right ? 1 : 0;
+          case '==': {
+            if (left instanceof CPointer && (right === null || right === 0)) return 0;
+            if (right instanceof CPointer && (left === null || left === 0)) return 0;
+            if (left instanceof CPointer && right instanceof CPointer) {
+              return (left.target === right.target && left.prop === right.prop && left.offset === right.offset) ? 1 : 0;
+            }
+            return left == right ? 1 : 0;
+          }
+          case '!=': {
+            if (left instanceof CPointer && (right === null || right === 0)) return 1;
+            if (right instanceof CPointer && (left === null || left === 0)) return 1;
+            if (left instanceof CPointer && right instanceof CPointer) {
+              return (left.target !== right.target || left.prop !== right.prop || left.offset !== right.offset) ? 1 : 0;
+            }
+            return left != right ? 1 : 0;
+          }
           case '<': return left < right ? 1 : 0;
           case '<=': return left <= right ? 1 : 0;
           case '>': return left > right ? 1 : 0;
@@ -1743,6 +2418,11 @@ export class Interpreter {
         if (expr.prefix) {
           if (expr.operator === '++' || expr.operator === '--') {
             const current = this.evaluateExpression(expr.argument, scope);
+            if (current instanceof CPointer) {
+              const next = new CPointer(current.target, current.prop, expr.operator === '++' ? current.offset + 1 : current.offset - 1);
+              this.assignTarget(expr.argument, next, scope);
+              return next;
+            }
             const next = expr.operator === '++' ? current + 1 : current - 1;
             this.assignTarget(expr.argument, next, scope);
             return next;
@@ -1753,14 +2433,42 @@ export class Interpreter {
             case '~': return ~val;
             case '-': return -val;
             case '+': return +val;
-            case '&': return expr.argument; // address representation
-            case '*': return val; // dereference
+            case '&': {
+              const arg = expr.argument;
+              if (arg.type === 'Identifier') {
+                const varName = arg.name;
+                const targetScope = scope.has(varName) ? scope : this.globalScope;
+                const currentVal = targetScope.get(varName);
+                if (typeof currentVal === 'object' && currentVal !== null && !(currentVal instanceof CPointer)) {
+                  return currentVal;
+                }
+                return new CPointer(targetScope, varName);
+              } else if (arg.type === 'MemberExpression') {
+                let obj = this.evaluateExpression(arg.object, scope);
+                if (obj instanceof CPointer) obj = obj.get();
+                const prop = arg.computed
+                  ? this.evaluateExpression(arg.property, scope)
+                  : arg.property.name;
+                return new CPointer(obj, prop);
+              }
+              return this.evaluateExpression(arg, scope);
+            }
+            case '*': {
+              if (val instanceof CPointer) return val.get();
+              if (Array.isArray(val)) return val[0];
+              return val;
+            }
             default:
               throw new RuntimeError(`Unsupported unary operator '${expr.operator}'`);
           }
         } else {
           // Postfix ++ / --
           const current = this.evaluateExpression(expr.argument, scope);
+          if (current instanceof CPointer) {
+            const next = new CPointer(current.target, current.prop, expr.operator === '++' ? current.offset + 1 : current.offset - 1);
+            this.assignTarget(expr.argument, next, scope);
+            return current;
+          }
           const next = expr.operator === '++' ? current + 1 : current - 1;
           this.assignTarget(expr.argument, next, scope);
           return current;
@@ -1775,12 +2483,15 @@ export class Interpreter {
       }
 
       case 'MemberExpression': {
-        const obj = this.evaluateExpression(expr.object, scope);
+        let obj = this.evaluateExpression(expr.object, scope);
+        if (obj instanceof CPointer) {
+          obj = obj.get();
+        }
         const prop = expr.computed
           ? this.evaluateExpression(expr.property, scope)
           : expr.property.name;
         if (obj === undefined || obj === null) {
-          throw new RuntimeError("Cannot read property of null or undefined array/object");
+          throw new RuntimeError(`Cannot access member '${prop}' of null or undefined`);
         }
         if (typeof obj === 'string') {
           const idx = Number(prop);
@@ -1806,10 +2517,31 @@ export class Interpreter {
       }
 
       case 'SizeofTypeExpression': {
-        if (['char', 'bool'].includes(expr.typeName)) return 1;
-        if (['short'].includes(expr.typeName)) return 2;
-        if (['int', 'float', 'long'].includes(expr.typeName)) return 4;
-        if (['double', 'long long'].includes(expr.typeName)) return 8;
+        const t = expr.typeName;
+        if (['char', 'bool'].includes(t)) return 1;
+        if (['short'].includes(t)) return 2;
+        if (['int', 'float', 'long'].includes(t)) return 4;
+        if (['double', 'long long'].includes(t)) return 8;
+        if (this.isStructType(t)) {
+          const def = this.getStructDef(t);
+          if (def && def.fields) {
+            if (def.kind === 'union') {
+              let maxFieldSize = 4;
+              for (const f of def.fields) {
+                const fieldSize = this.getFieldSize(f);
+                if (fieldSize > maxFieldSize) maxFieldSize = fieldSize;
+              }
+              return maxFieldSize;
+            } else {
+              let total = 0;
+              for (const f of def.fields) {
+                total += this.getFieldSize(f);
+              }
+              return Math.max(total, 4);
+            }
+          }
+          return 16;
+        }
         return 4;
       }
 
@@ -1819,10 +2551,12 @@ export class Interpreter {
           const val = scope.has(varName) ? scope.get(varName) : this.globalScope.get(varName);
           if (Array.isArray(val)) return val.length * 4;
           if (typeof val === 'string') return Math.max(val.length + 1, 1024);
+          if (val && typeof val === 'object' && !(val instanceof CPointer)) return 16;
         }
         const val = this.evaluateExpression(expr.argument, scope);
         if (Array.isArray(val)) return val.length * 4;
         if (typeof val === 'string') return Math.max(val.length + 1, 1024);
+        if (val && typeof val === 'object' && !(val instanceof CPointer)) return 16;
         return 4;
       }
 

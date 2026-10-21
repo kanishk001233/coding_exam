@@ -36,7 +36,8 @@ CREATE TABLE tests (
   created_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   enable_tab_switch_tracking BOOLEAN DEFAULT true,
-  enable_fullscreen_mode BOOLEAN DEFAULT true
+  enable_fullscreen_mode BOOLEAN DEFAULT true,
+  is_untimed BOOLEAN DEFAULT false
 );
 
 -- 3. Questions table
@@ -189,4 +190,14 @@ CREATE POLICY "Public submissions all" ON submissions FOR ALL USING (true) WITH 
 CREATE POLICY "Public submission results all" ON submission_results FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public test events all" ON test_events FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public help requests all" ON help_requests FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public events all" ON test_events FOR ALL USING (true) WITH CHECK (true);
+
+-- Enable Supabase Realtime for live updates (Live teacher monitor & help requests)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE test_attempts, help_requests;
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  -- Ignore if already added or in restricted environment
+  NULL;
+END $$;
