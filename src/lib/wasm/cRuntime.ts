@@ -2047,8 +2047,8 @@ export class Interpreter {
     for (let i = 0; i < funcNode.params.length; i++) {
       const param = funcNode.params[i];
       const rawArg = args[i] !== undefined ? args[i] : 0;
-      // Structs passed by value are copied
-      const paramVal = (rawArg && typeof rawArg === 'object' && !(rawArg instanceof CPointer) && !Array.isArray(rawArg))
+      // Structs passed by value (not by pointer) are copied
+      const paramVal = (!param.isPointer && rawArg && typeof rawArg === 'object' && !(rawArg instanceof CPointer) && !Array.isArray(rawArg))
         ? { ...rawArg }
         : rawArg;
       localScope.set(param.name, paramVal);
