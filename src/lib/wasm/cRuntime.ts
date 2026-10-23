@@ -1990,14 +1990,25 @@ export class Interpreter {
       }
     } else if (target.type === 'MemberExpression') {
       let obj = this.evaluateExpression(target.object, scope);
-      if (obj instanceof CPointer) {
-        obj = obj.get();
-      }
       const prop = target.computed
         ? this.evaluateExpression(target.property, scope)
         : target.property.name;
+      if (obj instanceof CPointer) {
+        const idx = Number(prop);
+        if (!isNaN(idx)) {
+          const indexedPtr = new CPointer(obj.target, obj.prop, obj.offset + idx);
+          indexedPtr.set(value);
+          return;
+        }
+        obj = obj.get();
+      }
       if (obj !== null && obj !== undefined && (typeof obj === 'object' || Array.isArray(obj))) {
         obj[prop] = value;
+      }
+    } else if (target.type === 'BinaryExpression') {
+      const ptr = this.evaluateExpression(target, scope);
+      if (ptr instanceof CPointer) {
+        ptr.set(value);
       }
     }
   }
@@ -2048,9 +2059,12 @@ export class Interpreter {
       const param = funcNode.params[i];
       const rawArg = args[i] !== undefined ? args[i] : 0;
       // Structs passed by value (not by pointer) are copied
-      const paramVal = (!param.isPointer && rawArg && typeof rawArg === 'object' && !(rawArg instanceof CPointer) && !Array.isArray(rawArg))
+      let paramVal = (!param.isPointer && rawArg && typeof rawArg === 'object' && !(rawArg instanceof CPointer) && !Array.isArray(rawArg))
         ? { ...rawArg }
         : rawArg;
+      if ((param.isPointer || param.isArray) && Array.isArray(rawArg)) {
+        paramVal = new CPointer(rawArg, 0, 0);
+      }
       localScope.set(param.name, paramVal);
     }
 
@@ -2141,6 +2155,9 @@ export class Interpreter {
         if (stmt.isPointer) {
           if (stmt.initialValue) {
             val = this.evaluateExpression(stmt.initialValue, scope);
+            if (Array.isArray(val)) {
+              val = new CPointer(val, 0, 0);
+            }
           } else {
             val = null;
           }
@@ -2284,8 +2301,26 @@ export class Interpreter {
           const varName = expr.left.name;
           const currentVal = scope.has(varName) ? scope.get(varName) : (this.globalScope.get(varName) || 0);
           let finalVal = rightVal;
-          if (expr.operator === '+=') finalVal = currentVal + rightVal;
-          else if (expr.operator === '-=') finalVal = currentVal - rightVal;
+          if (Array.isArray(finalVal) && (currentVal instanceof CPointer || currentVal === null)) {
+            finalVal = new CPointer(finalVal, 0, 0);
+          }
+          if (expr.operator === '+=') {
+            if (currentVal instanceof CPointer && typeof rightVal === 'number') {
+              finalVal = new CPointer(currentVal.target, currentVal.prop, currentVal.offset + rightVal);
+            } else if (Array.isArray(currentVal) && typeof rightVal === 'number') {
+              finalVal = new CPointer(currentVal, 0, rightVal);
+            } else {
+              finalVal = currentVal + rightVal;
+            }
+          } else if (expr.operator === '-=') {
+            if (currentVal instanceof CPointer && typeof rightVal === 'number') {
+              finalVal = new CPointer(currentVal.target, currentVal.prop, currentVal.offset - rightVal);
+            } else if (Array.isArray(currentVal) && typeof rightVal === 'number') {
+              finalVal = new CPointer(currentVal, 0, -rightVal);
+            } else {
+              finalVal = currentVal - rightVal;
+            }
+          }
           else if (expr.operator === '*=') finalVal = currentVal * rightVal;
           else if (expr.operator === '/=') finalVal = Math.trunc(currentVal / rightVal);
           else if (expr.operator === '%=') finalVal = currentVal % rightVal;
@@ -2298,12 +2333,24 @@ export class Interpreter {
           return finalVal;
         } else if (expr.left.type === 'MemberExpression') {
           let obj = this.evaluateExpression(expr.left.object, scope);
-          if (obj instanceof CPointer) {
-            obj = obj.get();
-          }
           const prop = expr.left.computed
             ? this.evaluateExpression(expr.left.property, scope)
             : expr.left.property.name;
+          if (obj instanceof CPointer) {
+            const idx = Number(prop);
+            if (!isNaN(idx)) {
+              const indexedPtr = new CPointer(obj.target, obj.prop, obj.offset + idx);
+              let finalVal = rightVal;
+              if (expr.operator === '+=') finalVal = indexedPtr.get() + rightVal;
+              else if (expr.operator === '-=') finalVal = indexedPtr.get() - rightVal;
+              else if (expr.operator === '*=') finalVal = indexedPtr.get() * rightVal;
+              else if (expr.operator === '/=') finalVal = Math.trunc(indexedPtr.get() / rightVal);
+              else if (expr.operator === '%=') finalVal = indexedPtr.get() % rightVal;
+              indexedPtr.set(finalVal);
+              return finalVal;
+            }
+            obj = obj.get();
+          }
           let finalVal = rightVal;
           if (expr.operator === '+=') finalVal = (obj[prop] !== undefined ? obj[prop] : 0) + rightVal;
           else if (expr.operator === '-=') finalVal = (obj[prop] !== undefined ? obj[prop] : 0) - rightVal;
@@ -2364,18 +2411,24 @@ export class Interpreter {
             if (Array.isArray(left) && typeof right === 'number') {
               return new CPointer(left, 0, right);
             }
+            if (Array.isArray(right) && typeof left === 'number') {
+              return new CPointer(right, 0, left);
+            }
             return left + right;
           }
           case '-': {
             if (left instanceof CPointer && typeof right === 'number') {
               return new CPointer(left.target, left.prop, left.offset - right);
             }
-            if (left instanceof CPointer && right instanceof CPointer) {
-              if (left.target === right.target) {
-                const idx1 = Number(left.prop) + left.offset;
-                const idx2 = Number(right.prop) + right.offset;
-                return idx1 - idx2;
-              }
+            if (Array.isArray(left) && typeof right === 'number') {
+              return new CPointer(left, 0, -right);
+            }
+            const p1 = left instanceof CPointer ? left : (Array.isArray(left) ? new CPointer(left, 0, 0) : null);
+            const p2 = right instanceof CPointer ? right : (Array.isArray(right) ? new CPointer(right, 0, 0) : null);
+            if (p1 && p2 && p1.target === p2.target) {
+              const idx1 = Number(p1.prop) + p1.offset;
+              const idx2 = Number(p2.prop) + p2.offset;
+              return idx1 - idx2;
             }
             return left - right;
           }
@@ -2385,23 +2438,63 @@ export class Interpreter {
           case '==': {
             if (left instanceof CPointer && (right === null || right === 0)) return 0;
             if (right instanceof CPointer && (left === null || left === 0)) return 0;
-            if (left instanceof CPointer && right instanceof CPointer) {
-              return (left.target === right.target && left.prop === right.prop && left.offset === right.offset) ? 1 : 0;
+            const p1 = left instanceof CPointer ? left : (Array.isArray(left) ? new CPointer(left, 0, 0) : null);
+            const p2 = right instanceof CPointer ? right : (Array.isArray(right) ? new CPointer(right, 0, 0) : null);
+            if (p1 && p2 && p1.target === p2.target) {
+              return (p1.prop === p2.prop && p1.offset === p2.offset) ? 1 : 0;
             }
             return left == right ? 1 : 0;
           }
           case '!=': {
             if (left instanceof CPointer && (right === null || right === 0)) return 1;
             if (right instanceof CPointer && (left === null || left === 0)) return 1;
-            if (left instanceof CPointer && right instanceof CPointer) {
-              return (left.target !== right.target || left.prop !== right.prop || left.offset !== right.offset) ? 1 : 0;
+            const p1 = left instanceof CPointer ? left : (Array.isArray(left) ? new CPointer(left, 0, 0) : null);
+            const p2 = right instanceof CPointer ? right : (Array.isArray(right) ? new CPointer(right, 0, 0) : null);
+            if (p1 && p2 && p1.target === p2.target) {
+              return (p1.prop !== p2.prop || p1.offset !== p2.offset) ? 1 : 0;
             }
             return left != right ? 1 : 0;
           }
-          case '<': return left < right ? 1 : 0;
-          case '<=': return left <= right ? 1 : 0;
-          case '>': return left > right ? 1 : 0;
-          case '>=': return left >= right ? 1 : 0;
+          case '<': {
+            const p1 = left instanceof CPointer ? left : (Array.isArray(left) ? new CPointer(left, 0, 0) : null);
+            const p2 = right instanceof CPointer ? right : (Array.isArray(right) ? new CPointer(right, 0, 0) : null);
+            if (p1 && p2 && p1.target === p2.target) {
+              const idx1 = Number(p1.prop) + p1.offset;
+              const idx2 = Number(p2.prop) + p2.offset;
+              return idx1 < idx2 ? 1 : 0;
+            }
+            return left < right ? 1 : 0;
+          }
+          case '<=': {
+            const p1 = left instanceof CPointer ? left : (Array.isArray(left) ? new CPointer(left, 0, 0) : null);
+            const p2 = right instanceof CPointer ? right : (Array.isArray(right) ? new CPointer(right, 0, 0) : null);
+            if (p1 && p2 && p1.target === p2.target) {
+              const idx1 = Number(p1.prop) + p1.offset;
+              const idx2 = Number(p2.prop) + p2.offset;
+              return idx1 <= idx2 ? 1 : 0;
+            }
+            return left <= right ? 1 : 0;
+          }
+          case '>': {
+            const p1 = left instanceof CPointer ? left : (Array.isArray(left) ? new CPointer(left, 0, 0) : null);
+            const p2 = right instanceof CPointer ? right : (Array.isArray(right) ? new CPointer(right, 0, 0) : null);
+            if (p1 && p2 && p1.target === p2.target) {
+              const idx1 = Number(p1.prop) + p1.offset;
+              const idx2 = Number(p2.prop) + p2.offset;
+              return idx1 > idx2 ? 1 : 0;
+            }
+            return left > right ? 1 : 0;
+          }
+          case '>=': {
+            const p1 = left instanceof CPointer ? left : (Array.isArray(left) ? new CPointer(left, 0, 0) : null);
+            const p2 = right instanceof CPointer ? right : (Array.isArray(right) ? new CPointer(right, 0, 0) : null);
+            if (p1 && p2 && p1.target === p2.target) {
+              const idx1 = Number(p1.prop) + p1.offset;
+              const idx2 = Number(p2.prop) + p2.offset;
+              return idx1 >= idx2 ? 1 : 0;
+            }
+            return left >= right ? 1 : 0;
+          }
           case '&&': return (Boolean(left) && Boolean(right)) ? 1 : 0;
           case '||': return (Boolean(left) || Boolean(right)) ? 1 : 0;
           case '&': return left & right;
@@ -2418,9 +2511,16 @@ export class Interpreter {
         if (expr.prefix) {
           if (expr.operator === '++' || expr.operator === '--') {
             const current = this.evaluateExpression(expr.argument, scope);
-            if (current instanceof CPointer) {
-              const next = new CPointer(current.target, current.prop, expr.operator === '++' ? current.offset + 1 : current.offset - 1);
-              this.assignTarget(expr.argument, next, scope);
+            const isPtr = current instanceof CPointer || Array.isArray(current);
+            if (isPtr) {
+              const base = current instanceof CPointer ? current : new CPointer(current, 0, 0);
+              const next = new CPointer(base.target, base.prop, expr.operator === '++' ? base.offset + 1 : base.offset - 1);
+              if (expr.argument.type === 'Identifier') {
+                const targetScope = scope.has(expr.argument.name) ? scope : this.globalScope;
+                targetScope.set(expr.argument.name, next);
+              } else {
+                this.assignTarget(expr.argument, next, scope);
+              }
               return next;
             }
             const next = expr.operator === '++' ? current + 1 : current - 1;
@@ -2464,9 +2564,16 @@ export class Interpreter {
         } else {
           // Postfix ++ / --
           const current = this.evaluateExpression(expr.argument, scope);
-          if (current instanceof CPointer) {
-            const next = new CPointer(current.target, current.prop, expr.operator === '++' ? current.offset + 1 : current.offset - 1);
-            this.assignTarget(expr.argument, next, scope);
+          const isPtr = current instanceof CPointer || Array.isArray(current);
+          if (isPtr) {
+            const base = current instanceof CPointer ? current : new CPointer(current, 0, 0);
+            const next = new CPointer(base.target, base.prop, expr.operator === '++' ? base.offset + 1 : base.offset - 1);
+            if (expr.argument.type === 'Identifier') {
+              const targetScope = scope.has(expr.argument.name) ? scope : this.globalScope;
+              targetScope.set(expr.argument.name, next);
+            } else {
+              this.assignTarget(expr.argument, next, scope);
+            }
             return current;
           }
           const next = expr.operator === '++' ? current + 1 : current - 1;
@@ -2484,12 +2591,17 @@ export class Interpreter {
 
       case 'MemberExpression': {
         let obj = this.evaluateExpression(expr.object, scope);
-        if (obj instanceof CPointer) {
-          obj = obj.get();
-        }
         const prop = expr.computed
           ? this.evaluateExpression(expr.property, scope)
           : expr.property.name;
+        if (obj instanceof CPointer) {
+          const idx = Number(prop);
+          if (!isNaN(idx)) {
+            const indexedPtr = new CPointer(obj.target, obj.prop, obj.offset + idx);
+            return indexedPtr.get();
+          }
+          obj = obj.get();
+        }
         if (obj === undefined || obj === null) {
           throw new RuntimeError(`Cannot access member '${prop}' of null or undefined`);
         }
