@@ -1892,6 +1892,27 @@ export class Interpreter {
     return baseSize;
   }
 
+  public getStructSize(typeName: string): number {
+    const def = this.getStructDef(typeName);
+    if (def && def.fields) {
+      if (def.kind === 'union') {
+        let maxFieldSize = 4;
+        for (const f of def.fields) {
+          const fieldSize = this.getFieldSize(f);
+          if (fieldSize > maxFieldSize) maxFieldSize = fieldSize;
+        }
+        return maxFieldSize;
+      } else {
+        let total = 0;
+        for (const f of def.fields) {
+          total += this.getFieldSize(f);
+        }
+        return Math.max(total, 4);
+      }
+    }
+    return 16;
+  }
+
   private instantiateType(typeName: string, scope: Map<string, any>): any {
     const def = this.getStructDef(typeName);
     const obj: Record<string, any> = {};
@@ -2001,6 +2022,21 @@ export class Interpreter {
         targetScope.set(target.name, value);
       }
     } else if (target.type === 'MemberExpression') {
+      if (target.object.type === 'MemberExpression') {
+        const parentObj = this.evaluateExpression(target.object.object, scope);
+        const parentProp = target.object.computed
+          ? this.evaluateExpression(target.object.property, scope)
+          : target.object.property.name;
+        if (parentObj instanceof CPointer && Array.isArray(parentObj.target)) {
+          const idx = Number(parentProp);
+          if (!isNaN(idx)) {
+            const targetIdx = Number(parentObj.prop) + parentObj.offset + idx;
+            if (parentObj.target[targetIdx] === undefined || typeof parentObj.target[targetIdx] !== 'object' || parentObj.target[targetIdx] === null) {
+              parentObj.target[targetIdx] = {};
+            }
+          }
+        }
+      }
       let obj = this.evaluateExpression(target.object, scope);
       const prop = target.computed
         ? this.evaluateExpression(target.property, scope)
@@ -2304,13 +2340,16 @@ export class Interpreter {
       }
 
       case 'CastExpression': {
-        const val = this.evaluateExpression(expr.argument, scope);
+        let val = this.evaluateExpression(expr.argument, scope);
         if (expr.isPointer) {
           if (Array.isArray(val)) {
-            return new CPointer(val, 0, 0);
+            val = new CPointer(val, 0, 0);
           }
-          if (val instanceof CPointer) {
-            return val;
+          if (val instanceof CPointer && this.isStructType(expr.castType)) {
+            const structSize = this.getStructSize(expr.castType);
+            const totalBytes = Array.isArray(val.target) ? val.target.length : 16;
+            const count = Math.max(1, Math.floor(totalBytes / structSize));
+            val.target = Array.from({ length: count }, () => this.instantiateType(expr.castType, scope));
           }
           return val;
         }
@@ -2361,6 +2400,21 @@ export class Interpreter {
           else this.globalScope.set(varName, finalVal);
           return finalVal;
         } else if (expr.left.type === 'MemberExpression') {
+          if (expr.left.object.type === 'MemberExpression') {
+            const parentObj = this.evaluateExpression(expr.left.object.object, scope);
+            const parentProp = expr.left.object.computed
+              ? this.evaluateExpression(expr.left.object.property, scope)
+              : expr.left.object.property.name;
+            if (parentObj instanceof CPointer && Array.isArray(parentObj.target)) {
+              const idx = Number(parentProp);
+              if (!isNaN(idx)) {
+                const targetIdx = Number(parentObj.prop) + parentObj.offset + idx;
+                if (parentObj.target[targetIdx] === undefined || typeof parentObj.target[targetIdx] !== 'object' || parentObj.target[targetIdx] === null) {
+                  parentObj.target[targetIdx] = {};
+                }
+              }
+            }
+          }
           let obj = this.evaluateExpression(expr.left.object, scope);
           const prop = expr.left.computed
             ? this.evaluateExpression(expr.left.property, scope)
@@ -2630,6 +2684,21 @@ export class Interpreter {
       }
 
       case 'MemberExpression': {
+        if (expr.object.type === 'MemberExpression') {
+          const parentObj = this.evaluateExpression(expr.object.object, scope);
+          const parentProp = expr.object.computed
+            ? this.evaluateExpression(expr.object.property, scope)
+            : expr.object.property.name;
+          if (parentObj instanceof CPointer && Array.isArray(parentObj.target)) {
+            const idx = Number(parentProp);
+            if (!isNaN(idx)) {
+              const targetIdx = Number(parentObj.prop) + parentObj.offset + idx;
+              if (parentObj.target[targetIdx] === undefined || typeof parentObj.target[targetIdx] !== 'object' || parentObj.target[targetIdx] === null) {
+                parentObj.target[targetIdx] = {};
+              }
+            }
+          }
+        }
         let obj = this.evaluateExpression(expr.object, scope);
         const prop = expr.computed
           ? this.evaluateExpression(expr.property, scope)
