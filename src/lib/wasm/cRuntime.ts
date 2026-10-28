@@ -53,7 +53,10 @@ export class CPointer {
     }
     if (Array.isArray(this.target)) {
       const idx = Number(this.prop) + this.offset;
-      return this.target[idx];
+      if (!isNaN(idx)) {
+        return this.target[idx];
+      }
+      return (this.target as any)[this.prop] !== undefined ? (this.target as any)[this.prop] : 0;
     }
     if (this.target && typeof this.target === 'object') {
       if (this.prop !== undefined && this.prop !== '') {
@@ -76,7 +79,11 @@ export class CPointer {
       }
     } else if (Array.isArray(this.target)) {
       const idx = Number(this.prop) + this.offset;
-      this.target[idx] = val;
+      if (!isNaN(idx)) {
+        this.target[idx] = val;
+      } else {
+        (this.target as any)[this.prop] = val;
+      }
     } else if (this.target && typeof this.target === 'object') {
       if (this.prop !== undefined && this.prop !== '') {
         this.target[this.prop] = val;
@@ -998,12 +1005,14 @@ export class Parser {
       if (this.isTypeSpecifier(this.peek())) {
         try {
           const castType = this.consumeType();
-          while (this.match('*')) { /* pointer cast */ }
+          let isPointer = false;
+          while (this.match('*')) { isPointer = true; }
           if (this.match(')')) {
             const right = this.parseUnary();
             return {
               type: 'CastExpression',
               castType,
+              isPointer,
               argument: right,
             };
           }
@@ -1802,10 +1811,9 @@ export class Interpreter {
       type: 'BuiltinFunction',
       name: 'malloc',
       call: (args: any[]) => {
-        const bytes = Number(args[0]) || 4;
-        const count = Math.max(1, Math.ceil(bytes / 4));
-        const arr: any = new Array(count).fill(0);
-        return arr;
+        const bytes = Math.max(1, Number(args[0]) || 4);
+        const arr: any = new Array(bytes).fill(0);
+        return new CPointer(arr, 0, 0);
       }
     });
 
@@ -1813,11 +1821,11 @@ export class Interpreter {
       type: 'BuiltinFunction',
       name: 'calloc',
       call: (args: any[]) => {
-        const num = Number(args[0]) || 1;
-        const size = Number(args[1]) || 4;
-        const count = Math.max(1, num);
-        const arr: any = new Array(count).fill(0);
-        return arr;
+        const num = Math.max(1, Number(args[0]) || 1);
+        const size = Math.max(1, Number(args[1]) || 4);
+        const total = num * size;
+        const arr: any = new Array(total).fill(0);
+        return new CPointer(arr, 0, 0);
       }
     });
 
@@ -1832,13 +1840,17 @@ export class Interpreter {
       name: 'realloc',
       call: (args: any[]) => {
         const ptr = args[0];
-        const newBytes = Number(args[1]) || 4;
-        const newCount = Math.max(1, Math.ceil(newBytes / 4));
-        if (Array.isArray(ptr)) {
-          while (ptr.length < newCount) ptr.push(0);
+        const newBytes = Math.max(1, Number(args[1]) || 4);
+        if (ptr instanceof CPointer && Array.isArray(ptr.target)) {
+          while (ptr.target.length < newBytes) ptr.target.push(0);
           return ptr;
         }
-        return new Array(newCount).fill(0);
+        if (Array.isArray(ptr)) {
+          while (ptr.length < newBytes) ptr.push(0);
+          return new CPointer(ptr, 0, 0);
+        }
+        const arr: any = new Array(newBytes).fill(0);
+        return new CPointer(arr, 0, 0);
       }
     });
   }
@@ -1998,6 +2010,11 @@ export class Interpreter {
         if (!isNaN(idx)) {
           const indexedPtr = new CPointer(obj.target, obj.prop, obj.offset + idx);
           indexedPtr.set(value);
+          return;
+        }
+        const targetObj = (obj.target && typeof obj.target === 'object') ? obj.target : obj.get();
+        if (targetObj && typeof targetObj === 'object') {
+          targetObj[prop] = value;
           return;
         }
         obj = obj.get();
@@ -2288,8 +2305,20 @@ export class Interpreter {
 
       case 'CastExpression': {
         const val = this.evaluateExpression(expr.argument, scope);
+        if (expr.isPointer) {
+          if (Array.isArray(val)) {
+            return new CPointer(val, 0, 0);
+          }
+          if (val instanceof CPointer) {
+            return val;
+          }
+          return val;
+        }
         const t = expr.castType;
-        if (['int', 'long', 'short'].includes(t)) return Math.trunc(Number(val));
+        if (['int', 'long', 'short'].includes(t)) {
+          if (val instanceof CPointer || Array.isArray(val)) return 1;
+          return Math.trunc(Number(val));
+        }
         if (['float', 'double'].includes(t)) return Number(val);
         if (t === 'char') return Number(val) & 0xFF;
         return val;
@@ -2347,6 +2376,17 @@ export class Interpreter {
               else if (expr.operator === '/=') finalVal = Math.trunc(indexedPtr.get() / rightVal);
               else if (expr.operator === '%=') finalVal = indexedPtr.get() % rightVal;
               indexedPtr.set(finalVal);
+              return finalVal;
+            }
+            const targetObj = (obj.target && typeof obj.target === 'object') ? obj.target : obj.get();
+            if (targetObj && typeof targetObj === 'object') {
+              let finalVal = rightVal;
+              if (expr.operator === '+=') finalVal = (targetObj[prop] || 0) + rightVal;
+              else if (expr.operator === '-=') finalVal = (targetObj[prop] || 0) - rightVal;
+              else if (expr.operator === '*=') finalVal = (targetObj[prop] || 0) * rightVal;
+              else if (expr.operator === '/=') finalVal = Math.trunc((targetObj[prop] || 0) / rightVal);
+              else if (expr.operator === '%=') finalVal = (targetObj[prop] || 0) % rightVal;
+              targetObj[prop] = finalVal;
               return finalVal;
             }
             obj = obj.get();
@@ -2600,7 +2640,14 @@ export class Interpreter {
             const indexedPtr = new CPointer(obj.target, obj.prop, obj.offset + idx);
             return indexedPtr.get();
           }
-          obj = obj.get();
+          if (obj.target && typeof obj.target === 'object' && prop in obj.target) {
+            return (obj.target as any)[prop];
+          }
+          const base = obj.get();
+          if (base && typeof base === 'object' && prop in base) {
+            return base[prop];
+          }
+          obj = base;
         }
         if (obj === undefined || obj === null) {
           throw new RuntimeError(`Cannot access member '${prop}' of null or undefined`);
