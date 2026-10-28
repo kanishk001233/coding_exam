@@ -1256,12 +1256,27 @@ export class Interpreter {
 
   public toCString(val: any): string {
     if (val === null || val === undefined) return '';
-    if (typeof val === 'string') return val;
+    if (val instanceof CPointer) {
+      if (Array.isArray(val.target)) {
+        let str = '';
+        for (let i = Number(val.prop) + val.offset; i < val.target.length; i++) {
+          const ch = val.target[i];
+          if (ch === 0 || ch === '\0' || ch === null || ch === undefined) break;
+          str += typeof ch === 'number' ? String.fromCharCode(ch) : String(ch)[0];
+        }
+        return str;
+      }
+      return this.toCString(val.target);
+    }
+    if (typeof val === 'string') {
+      const nullIdx = val.indexOf('\0');
+      return nullIdx !== -1 ? val.slice(0, nullIdx) : val;
+    }
     if (Array.isArray(val)) {
       let str = '';
       for (let i = 0; i < val.length; i++) {
         const ch = val[i];
-        if (ch === 0 || ch === null || ch === undefined) break;
+        if (ch === 0 || ch === '\0' || ch === null || ch === undefined) break;
         str += typeof ch === 'number' ? String.fromCharCode(ch) : String(ch)[0];
       }
       return str;
@@ -1757,16 +1772,17 @@ export class Interpreter {
     this.functions.set('strlen', {
       type: 'BuiltinFunction',
       name: 'strlen',
-      call: (args: any[]) => String(args[0] || '').length
+      call: (args: any[]) => this.toCString(args[0]).length
     });
 
     this.functions.set('strcmp', {
       type: 'BuiltinFunction',
       name: 'strcmp',
       call: (args: any[]) => {
-        const s1 = String(args[0] || '');
-        const s2 = String(args[1] || '');
-        return s1.localeCompare(s2);
+        const s1 = this.toCString(args[0]);
+        const s2 = this.toCString(args[1]);
+        if (s1 === s2) return 0;
+        return s1 < s2 ? -1 : 1;
       }
     });
 
@@ -1774,9 +1790,11 @@ export class Interpreter {
       type: 'BuiltinFunction',
       name: 'strncmp',
       call: (args: any[]) => {
-        const s1 = String(args[0] || '').slice(0, Number(args[2]));
-        const s2 = String(args[1] || '').slice(0, Number(args[2]));
-        return s1.localeCompare(s2);
+        const n = Number(args[2]) || 0;
+        const s1 = this.toCString(args[0]).slice(0, n);
+        const s2 = this.toCString(args[1]).slice(0, n);
+        if (s1 === s2) return 0;
+        return s1 < s2 ? -1 : 1;
       }
     });
 
@@ -1784,11 +1802,42 @@ export class Interpreter {
       type: 'BuiltinFunction',
       name: 'strcpy',
       call: (args: any[], scope: Map<string, any>, astArgs: ASTNode[]) => {
-        const src = String(args[1] || '');
+        const dest = args[0];
+        const src = this.toCString(args[1]);
+        if (dest instanceof CPointer && Array.isArray(dest.target)) {
+          const startIdx = Number(dest.prop) + dest.offset;
+          for (let i = 0; i < src.length; i++) {
+            dest.target[startIdx + i] = src.charCodeAt(i);
+          }
+          dest.target[startIdx + src.length] = 0;
+          return dest;
+        }
         if (astArgs && astArgs[0]) {
           this.assignTarget(astArgs[0], src, scope);
         }
-        return src;
+        return dest || src;
+      }
+    });
+
+    this.functions.set('strncpy', {
+      type: 'BuiltinFunction',
+      name: 'strncpy',
+      call: (args: any[], scope: Map<string, any>, astArgs: ASTNode[]) => {
+        const dest = args[0];
+        const src = this.toCString(args[1]);
+        const n = Number(args[2]) || 0;
+        if (dest instanceof CPointer && Array.isArray(dest.target)) {
+          const startIdx = Number(dest.prop) + dest.offset;
+          for (let i = 0; i < n; i++) {
+            dest.target[startIdx + i] = i < src.length ? src.charCodeAt(i) : 0;
+          }
+          return dest;
+        }
+        const copied = src.slice(0, n);
+        if (astArgs && astArgs[0]) {
+          this.assignTarget(astArgs[0], copied, scope);
+        }
+        return dest || copied;
       }
     });
 
@@ -1796,13 +1845,275 @@ export class Interpreter {
       type: 'BuiltinFunction',
       name: 'strcat',
       call: (args: any[], scope: Map<string, any>, astArgs: ASTNode[]) => {
-        const dest = String(args[0] || '');
-        const src = String(args[1] || '');
-        const combined = dest + src;
+        const dest = args[0];
+        const destStr = this.toCString(args[0]);
+        const srcStr = this.toCString(args[1]);
+        const combined = destStr + srcStr;
+        if (dest instanceof CPointer && Array.isArray(dest.target)) {
+          const startIdx = Number(dest.prop) + dest.offset;
+          for (let i = 0; i < combined.length; i++) {
+            dest.target[startIdx + i] = combined.charCodeAt(i);
+          }
+          dest.target[startIdx + combined.length] = 0;
+          return dest;
+        }
         if (astArgs && astArgs[0]) {
           this.assignTarget(astArgs[0], combined, scope);
         }
-        return combined;
+        return dest || combined;
+      }
+    });
+
+    this.functions.set('strncat', {
+      type: 'BuiltinFunction',
+      name: 'strncat',
+      call: (args: any[], scope: Map<string, any>, astArgs: ASTNode[]) => {
+        const dest = args[0];
+        const destStr = this.toCString(args[0]);
+        const n = Number(args[2]) || 0;
+        const srcStr = this.toCString(args[1]).slice(0, n);
+        const combined = destStr + srcStr;
+        if (dest instanceof CPointer && Array.isArray(dest.target)) {
+          const startIdx = Number(dest.prop) + dest.offset;
+          for (let i = 0; i < combined.length; i++) {
+            dest.target[startIdx + i] = combined.charCodeAt(i);
+          }
+          dest.target[startIdx + combined.length] = 0;
+          return dest;
+        }
+        if (astArgs && astArgs[0]) {
+          this.assignTarget(astArgs[0], combined, scope);
+        }
+        return dest || combined;
+      }
+    });
+
+    this.functions.set('strcspn', {
+      type: 'BuiltinFunction',
+      name: 'strcspn',
+      call: (args: any[]) => {
+        const s = this.toCString(args[0]);
+        const reject = this.toCString(args[1]);
+        for (let i = 0; i < s.length; i++) {
+          if (reject.includes(s[i])) {
+            return i;
+          }
+        }
+        return s.length;
+      }
+    });
+
+    this.functions.set('strspn', {
+      type: 'BuiltinFunction',
+      name: 'strspn',
+      call: (args: any[]) => {
+        const s = this.toCString(args[0]);
+        const accept = this.toCString(args[1]);
+        for (let i = 0; i < s.length; i++) {
+          if (!accept.includes(s[i])) {
+            return i;
+          }
+        }
+        return s.length;
+      }
+    });
+
+    this.functions.set('strchr', {
+      type: 'BuiltinFunction',
+      name: 'strchr',
+      call: (args: any[]) => {
+        const ptr = args[0];
+        const s = this.toCString(ptr);
+        const ch = typeof args[1] === 'number' ? String.fromCharCode(args[1]) : String(args[1] || '')[0];
+        const idx = s.indexOf(ch);
+        if (idx === -1) return null;
+        if (ptr instanceof CPointer) {
+          return new CPointer(ptr.target, ptr.prop, ptr.offset + idx);
+        }
+        if (Array.isArray(ptr)) {
+          return new CPointer(ptr, 0, idx);
+        }
+        return s.slice(idx);
+      }
+    });
+
+    this.functions.set('strrchr', {
+      type: 'BuiltinFunction',
+      name: 'strrchr',
+      call: (args: any[]) => {
+        const ptr = args[0];
+        const s = this.toCString(ptr);
+        const ch = typeof args[1] === 'number' ? String.fromCharCode(args[1]) : String(args[1] || '')[0];
+        const idx = s.lastIndexOf(ch);
+        if (idx === -1) return null;
+        if (ptr instanceof CPointer) {
+          return new CPointer(ptr.target, ptr.prop, ptr.offset + idx);
+        }
+        if (Array.isArray(ptr)) {
+          return new CPointer(ptr, 0, idx);
+        }
+        return s.slice(idx);
+      }
+    });
+
+    this.functions.set('strstr', {
+      type: 'BuiltinFunction',
+      name: 'strstr',
+      call: (args: any[]) => {
+        const ptr = args[0];
+        const haystack = this.toCString(ptr);
+        const needle = this.toCString(args[1]);
+        if (!needle) return ptr;
+        const idx = haystack.indexOf(needle);
+        if (idx === -1) return null;
+        if (ptr instanceof CPointer) {
+          return new CPointer(ptr.target, ptr.prop, ptr.offset + idx);
+        }
+        if (Array.isArray(ptr)) {
+          return new CPointer(ptr, 0, idx);
+        }
+        return haystack.slice(idx);
+      }
+    });
+
+    this.functions.set('strpbrk', {
+      type: 'BuiltinFunction',
+      name: 'strpbrk',
+      call: (args: any[]) => {
+        const ptr = args[0];
+        const s = this.toCString(ptr);
+        const accept = this.toCString(args[1]);
+        for (let i = 0; i < s.length; i++) {
+          if (accept.includes(s[i])) {
+            if (ptr instanceof CPointer) return new CPointer(ptr.target, ptr.prop, ptr.offset + i);
+            if (Array.isArray(ptr)) return new CPointer(ptr, 0, i);
+            return s.slice(i);
+          }
+        }
+        return null;
+      }
+    });
+
+    this.functions.set('strdup', {
+      type: 'BuiltinFunction',
+      name: 'strdup',
+      call: (args: any[]) => {
+        const s = this.toCString(args[0]);
+        const arr: any = new Array(s.length + 1).fill(0);
+        for (let i = 0; i < s.length; i++) {
+          arr[i] = s.charCodeAt(i);
+        }
+        arr[s.length] = 0;
+        return new CPointer(arr, 0, 0);
+      }
+    });
+
+    this.functions.set('memset', {
+      type: 'BuiltinFunction',
+      name: 'memset',
+      call: (args: any[]) => {
+        const ptr = args[0];
+        const val = Number(args[1]) || 0;
+        const num = Number(args[2]) || 0;
+        if (ptr instanceof CPointer && Array.isArray(ptr.target)) {
+          const startIdx = Number(ptr.prop) + ptr.offset;
+          for (let i = 0; i < num; i++) {
+            ptr.target[startIdx + i] = val;
+          }
+          return ptr;
+        }
+        if (Array.isArray(ptr)) {
+          for (let i = 0; i < num; i++) {
+            ptr[i] = val;
+          }
+          return ptr;
+        }
+        return ptr;
+      }
+    });
+
+    this.functions.set('memcpy', {
+      type: 'BuiltinFunction',
+      name: 'memcpy',
+      call: (args: any[]) => {
+        const dest = args[0];
+        const src = args[1];
+        const num = Number(args[2]) || 0;
+        const getVal = (p: any, i: number) => {
+          if (p instanceof CPointer && Array.isArray(p.target)) {
+            return p.target[Number(p.prop) + p.offset + i];
+          }
+          if (Array.isArray(p)) return p[i];
+          if (typeof p === 'string') return p.charCodeAt(i);
+          return 0;
+        };
+        const setVal = (p: any, i: number, v: any) => {
+          if (p instanceof CPointer && Array.isArray(p.target)) {
+            p.target[Number(p.prop) + p.offset + i] = v;
+          } else if (Array.isArray(p)) {
+            p[i] = v;
+          }
+        };
+        for (let i = 0; i < num; i++) {
+          setVal(dest, i, getVal(src, i));
+        }
+        return dest;
+      }
+    });
+
+    this.functions.set('memmove', {
+      type: 'BuiltinFunction',
+      name: 'memmove',
+      call: (args: any[]) => {
+        const dest = args[0];
+        const src = args[1];
+        const num = Number(args[2]) || 0;
+        const temp: any[] = [];
+        const getVal = (p: any, i: number) => {
+          if (p instanceof CPointer && Array.isArray(p.target)) {
+            return p.target[Number(p.prop) + p.offset + i];
+          }
+          if (Array.isArray(p)) return p[i];
+          if (typeof p === 'string') return p.charCodeAt(i);
+          return 0;
+        };
+        const setVal = (p: any, i: number, v: any) => {
+          if (p instanceof CPointer && Array.isArray(p.target)) {
+            p.target[Number(p.prop) + p.offset + i] = v;
+          } else if (Array.isArray(p)) {
+            p[i] = v;
+          }
+        };
+        for (let i = 0; i < num; i++) {
+          temp.push(getVal(src, i));
+        }
+        for (let i = 0; i < num; i++) {
+          setVal(dest, i, temp[i]);
+        }
+        return dest;
+      }
+    });
+
+    this.functions.set('memcmp', {
+      type: 'BuiltinFunction',
+      name: 'memcmp',
+      call: (args: any[]) => {
+        const s1 = args[0];
+        const s2 = args[1];
+        const num = Number(args[2]) || 0;
+        const getVal = (p: any, i: number) => {
+          if (p instanceof CPointer && Array.isArray(p.target)) {
+            return p.target[Number(p.prop) + p.offset + i] || 0;
+          }
+          if (Array.isArray(p)) return p[i] || 0;
+          if (typeof p === 'string') return p.charCodeAt(i) || 0;
+          return 0;
+        };
+        for (let i = 0; i < num; i++) {
+          const diff = getVal(s1, i) - getVal(s2, i);
+          if (diff !== 0) return diff;
+        }
+        return 0;
       }
     });
 
